@@ -518,13 +518,115 @@ function nextTrainingStep() {
     countdownInterval = setInterval(() => {
         secondsLeft--;
         if (secondsLeft > 0 && document.getElementById('timerDisplay')) {
-            document.getElementById('timerDisplay').innerText = `Вспомни перевод... (${secondsLeft} сек)`;
-        } else {
-            clearInterval(countdownInterval);
+// ========================================================
+// В2. ЦИКЛИЧЕСКИЙ АЛГОРИТМ РАБОТЫ ТРЕНАЖЁРА С АВТО-ОЗВУЧКОЙ (ВОЗВРАТ НАДЁЖНОЙ КЛАССИКИ)
+// ========================================================
+
+function toggleTraining() { if (isTraining) stopTraining(); else startTraining(); }
+
+function startTraining() {
+    const topic = appData[currentLanguage].find(t => t.id === activeTopicId);
+    if (!topic || topic.words.length === 0) { alert("В этой папке нет слов для тренировки!"); return; }
+    isTraining = true; saveTrainerSettings();
+    if(document.getElementById('mainScreen')) document.getElementById('mainScreen').style.display = 'none';
+    if(document.getElementById('trainerScreen')) document.getElementById('trainerScreen').style.display = 'block';
+    nextTrainingStep();
+}
+
+function stopTraining() {
+    isTraining = false; clearTimeout(wordTimeout); clearInterval(countdownInterval);
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if(document.getElementById('mainScreen')) document.getElementById('mainScreen').style.display = 'block';
+    if(document.getElementById('trainerScreen')) document.getElementById('trainerScreen').style.display = 'none';
+}
+
+function nextTrainingStep() {
+    if (!isTraining) return;
+    const topic = appData[currentLanguage].find(t => t.id === activeTopicId);
+    if (!topic || topic.words.length === 0) { stopTraining(); return; }
+
+    const randomWord = topic.words[Math.floor(Math.random() * topic.words.length)];
+    const speedInput = document.getElementById('speedRangeNew');
+    const pauseInput = document.getElementById('pauseRangeNew');
+    const modeSelect = document.getElementById('modeSelectNew');
+    const voiceSelect = document.getElementById('voiceSelectNew');
+    
+    const currentSpeed = speedInput ? parseFloat(speedInput.value) : 1.0;
+    const userPauseSeconds = pauseInput ? parseInt(pauseInput.value) : 3;
+    const currentMode = modeSelect ? modeSelect.value : 'foreign-ru';
+
+    if(document.getElementById('translationDisplay')) document.getElementById('translationDisplay').innerText = "";
+
+    let firstSpeechText = currentMode === 'foreign-ru' ? randomWord.foreign : randomWord.russian;
+    let firstSpeechLang = currentMode === 'foreign-ru' ? (currentLanguage === 'en' ? 'en-US' : 'et-EE') : 'ru-RU';
+    let secondSpeechText = currentMode === 'foreign-ru' ? randomWord.russian : randomWord.foreign;
+    let secondSpeechLang = currentMode === 'foreign-ru' ? 'ru-RU' : (currentLanguage === 'en' ? 'en-US' : 'et-EE');
+
+    if(document.getElementById('wordDisplay')) document.getElementById('wordDisplay').innerText = firstSpeechText;
+
+    function speakWithRobot(text, targetLang) {
+        if(document.getElementById('audioTypeDisplay')) document.getElementById('audioTypeDisplay').innerText = "🤖 Раздельная озвучка носителями";
+        if (typeof speechSynthesis === 'undefined') return;
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = currentSpeed;
+        
+        const allVoices = window.speechSynthesis.getVoices();
+        const shortLang = targetLang.substring(0, 2).toLowerCase();
+        
+        let selectedVoice = null;
+        
+        // 1. Ручной выбор в списке (если есть)
+        if (voiceSelect && voiceSelect.value && voiceSelect.value !== 'auto_best') {
+            const userVoice = allVoices.find(v => v.name === voiceSelect.value);
+            if (userVoice && userVoice.lang.toLowerCase().startsWith(shortLang)) {
+                selectedVoice = userVoice;
+            }
         }
+        
+        // 2. Возвращаем оригинальную, стабильную автоматическую схему подбора
+        if (!selectedVoice) {
+            if (shortLang === 'en') {
+                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && v.name.includes('Male') && (v.name.includes('Natural') || v.name.includes('Premium')));
+                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && (v.name.includes('David') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('James')));
+                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && v.name.includes('Male'));
+            } else if (shortLang === 'ru') {
+                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && (v.name.includes('Maksim') || v.name.includes('Maxim')));
+                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && (v.name.includes('Dmitry') || v.name.includes('Anton') || v.name.includes('Aleksandr')));
+                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && v.name.includes('Google') && !v.name.includes('Female'));
+                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && v.name.includes('Male'));
+            } else if (shortLang === 'et') {
+                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('et') && (v.name.includes('Mari') || v.name.includes('Eki') || v.name.includes('Estonian Mari')));
+                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('et') && (v.name.includes('Johannes') || v.name.includes('Tõnu') || v.name.includes('Kert')));
+            }
+            
+            if (!selectedVoice) {
+                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith(shortLang));
+            }
+        }
+        
+        if (selectedVoice) utterance.voice = selectedVoice; else utterance.lang = targetLang;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // Первый шаг (Слово)
+    if (currentMode === 'foreign-ru' && randomWord.customAudio) {
+        if(document.getElementById('audioTypeDisplay')) document.getElementById('audioTypeDisplay').innerText = "🎤 Звучит твой голос";
+        const audio = new Audio(randomWord.customAudio);
+        audio.playbackRate = currentSpeed;
+        audio.play().catch(() => speakWithRobot(firstSpeechText, firstSpeechLang));
+    } else { speakWithRobot(firstSpeechText, firstSpeechLang); }
+
+    let secondsLeft = userPauseSeconds;
+    if(document.getElementById('timerDisplay')) document.getElementById('timerDisplay').innerText = `Вспомни перевод... (${secondsLeft} сек)`;
+    clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft > 0 && document.getElementById('timerDisplay')) document.getElementById('timerDisplay').innerText = `Вспомни перевод... (${secondsLeft} сек)`;
+        else clearInterval(countdownInterval);
     }, 1000);
 
-    // --- ШАГ 2: Пауза прошла, произносим перевод ---
+    // Второй шаг (Перевод)
     clearTimeout(wordTimeout);
     wordTimeout = setTimeout(() => {
         if (!isTraining) return;
@@ -535,9 +637,13 @@ function nextTrainingStep() {
             const audio = new Audio(randomWord.customAudio);
             audio.playbackRate = currentSpeed;
             audio.play().catch(() => speakWithRobot(secondSpeechText, secondSpeechLang));
-        } else { 
-            speakWithRobot(secondSpeechText, secondSpeechLang); 
-        }
+        } else { speakWithRobot(secondSpeechText, secondSpeechLang); }
+
+        wordTimeout = setTimeout(() => { if (isTraining) nextTrainingStep(); }, 2500);
+    }, userPauseSeconds * 1000);
+}
+
+document.addEventListener("DOMContentLoaded", () => { initApp(); });
 
         // Переход к следующей карточке слова через 2.5 секунды
         wordTimeout = setTimeout(() => { if (isTraining) nextTrainingStep(); }, 2500);
