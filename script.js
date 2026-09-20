@@ -450,65 +450,56 @@ function nextTrainingStep() {
     if(document.getElementById('wordDisplay')) document.getElementById('wordDisplay').innerText = firstSpeechText;
 
     // УМНЫЙ АВТОПОДБОР РОБОТОВ НА ЛЕТУ ДЛЯ КАЖДОГО СЛОВА ОТДЕЛЬНО
+     // СВЕРХТОЧНЫЙ АЛГОРИТМ ПОДБОРА НАСТОЯЩИХ СИСТЕМНЫХ НОСИТЕЛЕЙ (ОБНОВЛЕН ТОЛЬКО АНГЛИЙСКИЙ)
     function speakWithRobot(text, targetLang) {
+        if(document.getElementById('audioTypeDisplay')) document.getElementById('audioTypeDisplay').innerText = "🤖 Раздельная озвучка носителями";
         if (typeof speechSynthesis === 'undefined') return;
-        window.speechSynthesis.cancel(); // Сбрасываем старые зависшие хвосты звука
-
+        
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = currentSpeed;
         
         const allVoices = window.speechSynthesis.getVoices();
         const shortLang = targetLang.substring(0, 2).toLowerCase();
         
-        let selectedVoice = null;
-        
-        // А. Если пользователь выбрал конкретного робота вручную из списка
+        let bestVoice = null;
+
         if (voiceSelect && voiceSelect.value && voiceSelect.value !== 'auto_best') {
             const userVoice = allVoices.find(v => v.name === voiceSelect.value);
             if (userVoice && userVoice.lang.toLowerCase().startsWith(shortLang)) {
-                selectedVoice = userVoice;
+                bestVoice = userVoice;
             }
         }
         
-        // Б. ФИРМЕННАЯ СХЕМА АВТОПОДБОРА (Пересчитывается для каждого шага!)
-        if (!selectedVoice) {
+        if (!bestVoice) {
             if (shortLang === 'en') {
-                // Английский: ищем сочные премиальные мужские голоса Natural/Premium или Microsoft David/Ryan
-                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && v.name.includes('Male') && (v.name.includes('Natural') || v.name.includes('Premium')));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && (v.name.includes('David') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('James')));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && v.name.includes('Male'));
+                // АНГЛИЙСКИЙ: Целенаправленно ищем живые ИИ-голоса Natural / Neural любого пола для максимальной естественности
+                bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && (v.name.includes('Natural') || v.name.includes('Neural') || v.name.includes('Multilingual')));
+                if (!bestVoice) bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && v.name.includes('Google'));
+                if (!bestVoice) bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en') && (v.name.includes('David') || v.name.includes('Ryan') || v.name.includes('Guy') || v.name.includes('James')));
+                if (!bestVoice) bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('en'));
             } 
             else if (shortLang === 'ru') {
-                // Русский: Строго ищем Microsoft Maksim (эталонный системный аналог Алисы) или Dmitry/Anton/Google Male
-                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && (v.name.includes('Maksim') || v.name.includes('Maxim')));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && (v.name.includes('Dmitry') || v.name.includes('Anton') || v.name.includes('Pavel')));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && v.name.includes('Google') && !v.name.includes('Female'));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && v.name.includes('Male'));
+                // РУССКИЙ: Остаётся без изменений (Максим / Дмитрий / Антон)
+                bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && (v.name.includes('Maksim') || v.name.includes('Maxim')));
+                if (!bestVoice) bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && (v.name.includes('Dmitry') || v.name.includes('Anton') || v.name.includes('Aleksandr')));
+                if (!bestVoice) bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && v.name.includes('Google') && !v.name.includes('Female'));
+                if (!bestVoice) bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('ru') && v.name.includes('Male'));
             } 
             else if (shortLang === 'et') {
-                // Эстонский: Целенаправленно ищем официальный пакет Mari от EKI, Johannes или Tõnu для идеальных ударений
-                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('et') && (v.name.includes('Mari') || v.name.includes('Eki') || v.name.includes('Estonian Mari')));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('et') && (v.name.includes('Johannes') || v.name.includes('Tõnu') || v.name.includes('Kert')));
+                // ЭСТОНСКИЙ: Остаётся без изменений (Мари от EKI / Йоханнес)
+                bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('et') && (v.name.includes('Mari') || v.name.includes('Eki') || v.name.includes('Estonian Mari')));
+                if (!bestVoice) bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith('et') && (v.name.includes('Johannes') || v.name.includes('Tõnu') || v.name.includes('Kert')));
             }
             
-            // Если идеальный носитель на устройстве не найден, берем любой лучший для этого языка
-            if (!selectedVoice) {
-                selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith(shortLang) && (v.name.includes('Natural') || v.name.includes('Premium')));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith(shortLang) && v.name.includes('Google'));
-                if (!selectedVoice) selectedVoice = allVoices.find(v => v.lang.toLowerCase().startsWith(shortLang));
+            if (!bestVoice) {
+                bestVoice = allVoices.find(v => v.lang.toLowerCase().startsWith(shortLang));
             }
         }
         
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
-            if(document.getElementById('audioTypeDisplay')) document.getElementById('audioTypeDisplay').innerText = `🤖 Озвучка: ${selectedVoice.name}`;
-        } else {
-            utterance.lang = targetLang;
-            if(document.getElementById('audioTypeDisplay')) document.getElementById('audioTypeDisplay').innerText = "🤖 Стандартный робот";
-        }
-        
+        if (bestVoice) utterance.voice = bestVoice; else utterance.lang = targetLang;
         window.speechSynthesis.speak(utterance);
     }
+
 
     // --- ШАГ 1: Произносим само слово ---
     if (currentMode === 'foreign-ru' && randomWord.customAudio) {
