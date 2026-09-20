@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой Словарь — Автономный Тренажёр</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎧 Умный Языковой Тренажёр</h1>
+        
+        <!-- ПАНЕЛЬ УПРАВЛЕНИЯ РЕЗЕРВНЫМИ КОПИЯМИ (TXT) -->
+        <div class="card" style="margin-bottom: 15px; border: 1px dashed #cbd5e1; background: #f8fafc; padding: 15px; border-radius: 8px;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #475569; text-align: center;">💾 Резервные копии (TXT)</h3>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                
+                <!-- Кнопка скачивания всей базы слов -->
+                <button onclick="exportAllDataToTXT()" style="width: 100%; padding: 10px; font-weight: bold; background: #0284c7; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">📥 Скачать весь словарь</button>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <!-- Кнопка полной замены базы из файла -->
+                    <label style="background: #10b981; color: white; text-align: center; cursor: pointer; padding: 10px 0; font-size: 13px; font-weight: bold; border-radius: 6px;">
+                        🔄 Восстановить всё
+                        <input type="file" accept=".txt" style="display: none;" onchange="importAllDataFromTXT(event)">
+                    </label>
+                    
+                    <!-- Кнопка добавления новой папки из файла без удаления старых -->
+                    <label style="background: #f59e0b; color: white; text-align: center; cursor: pointer; padding: 10px 0; font-size: 13px; font-weight: bold; border-radius: 6px;">
+                        ➕ Добавить тему
+                        <input type="file" accept=".txt" style="display: none;" onchange="importSingleFolderFromTXT(event)">
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ГЛАВНЫЙ ЭКРАН ПРИЛОЖЕНИЯ -->
+        <div id="mainScreen" style="display: block;">
+            
+            <!-- Переключатель языковых полок -->
+            <div class="lang-tabs">
+                <button class="tab-btn active" id="tab-en" onclick="switchLanguage('en')">Английский 🇬🇧</button>
+                <button class="tab-btn" id="tab-et" onclick="switchLanguage('et')">Эстонский 🇪🇪</button>
+            </div>
+
+            <!-- ИСПРАВЛЕНО: Карточка настроек аудио-тренировки (ПОЛНОСТЬЮ АВТОМАТИЧЕСКАЯ БЕЗ СЛАЙДЕРОВ) -->
+            <div class="card" style="margin-top: 15px; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; padding: 15px; text-align: center;">
+                <span style="font-weight: bold; color: #16a34a; font-size: 14px;">✨ Умная озвучка носителями и параметры речи настроены автоматически</span>
+            </div>
+
+            <!-- Бокс выбора направления (оставлен для удобства переключения) -->
+            <div class="card" style="margin-top: 15px; padding: 15px;">
+                <label class="field-label" style="font-weight: bold; display: block; margin-bottom: 8px; color: #334155; font-size: 14px;">Направление тренировки:</label>
+                <select id="modeSelectNew" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; background: white; font-size: 14px;">
+                    <option value="foreign-ru">Иностранный ➡️ Русский</option>
+                    <option value="ru-foreign">Русский ➡️ Иностранный</option>
+                </select>
+            </div>
+
+            <!-- Блок управления темами (папками) -->
+            <div class="card" style="margin-top: 15px;">
+                <h2 class="section-title">📂 Темы и Папки:</h2>
+                <div class="add-box">
+                    <input type="text" id="newTopicInput" placeholder="Название новой темы">
+                    <button class="btn-action" onclick="createTopic()">+ Создать папку</button>
+                </div>
+                <div id="topicsContainer" class="topics-grid"></div>
+            </div>
+
+            <!-- СОДЕРЖИМОЕ ОТКРЫТОЙ ПАПКИ -->
+            <div class="card" id="folderContentBlock" style="display: none; margin-top: 15px;">
+                <h2 class="section-title" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <span id="activeFolderName">Тема не выбрана</span>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn-small-edit" onclick="renameActiveTopic()">✏️</button>
+                        <button onclick="exportCurrentFolderToTXT()" style="background: #e2e8f0; color: #334155; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">📥 Скачать тему</button>
+                    </div>
+                </h2>
+
+                <button id="btn-toggle-train" onclick="toggleTraining()" style="width: 100%; padding: 12px; font-weight: bold; background: #22c55e; color: white; border: none; border-radius: 6px; cursor: pointer; margin-bottom: 20px; font-size: 16px;">🏋️ Запустить тренажёр для этой папки</button>
+
+                <h3 class="sub-title">➕ Добавить слово в эту папку:</h3>
+                <div class="add-word-form">
+                    <input type="text" id="foreignWordInput" placeholder="Слово на иностранном">
+                    <input type="text" id="russianWordInput" placeholder="Перевод на русском">
+                    <button class="btn-action" onclick="addWordToTopic()">Добавить</button>
+                </div>
+                
+                <div id="wordsContainer" class="words-list-box" style="margin-top: 15px;"></div>
+            </div>
+        </div>
+
+        <!-- ЭКРАН АКТИВНОГО ТРЕНАЖЁРА -->
+        <div class="trainer-screen" id="trainerScreen" style="display: none;">
+            <div class="current-word" id="wordDisplay">Ожидание...</div>
+            <div class="translation-word" id="translationDisplay"></div>
+            <div class="audio-type" id="audioTypeDisplay"></div>
+            <div class="timer" id="timerDisplay">Пауза...</div>
+            <button class="stop" onclick="stopTraining()">⏹ Остановить тренировку</button>
+        </div>
+    </div>
+
+    <!-- ИСПРАВЛЕНО: Версия поднята до 600 для полной очистки кэша на Vercel -->
+    <script src="script.js?v=600"></script>
+</body>
+</html>
