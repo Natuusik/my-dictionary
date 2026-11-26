@@ -3,163 +3,442 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Тренажёр диктанта (С резервным аудио)</title>
+    <title>Аудио-словарь и тренажёр</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4">
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
 
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6 space-y-6">
-        <h1 class="text-2xl font-bold text-center text-indigo-600">Dictation Pro (Fix)</h1>
-
-        <!-- Настройка списка -->
-        <div id="setup-screen" class="space-y-4">
+    <div class="w-full max-w-xl bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+        <!-- Шапка -->
+        <div class="bg-indigo-600 p-5 text-white flex justify-between items-center">
             <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">Ваш список слов (по одному или через запятую):</label>
-                <textarea id="words-input" rows="5" class="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none">apple, banana, computer, developer, flexibility</textarea>
+                <h1 class="text-xl font-bold">Аудио-тренажёр слов</h1>
+                <p class="text-indigo-200 text-xs">Диктовка по папкам с интервалом</p>
             </div>
-            <button onclick="startDictation()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition">
-                Начать диктант
-            </button>
+            <span id="total-words-badge" class="bg-indigo-500 text-xs px-3 py-1 rounded-full font-medium">0 слов</span>
         </div>
 
-        <!-- Экран диктанта -->
-        <div id="dictation-screen" class="space-y-6 hidden">
-            <div class="flex justify-between text-sm text-slate-500 font-medium">
-                <span id="progress-text">Слово 1 из 5</span>
-                <span id="score-text">Ошибок: 0</span>
-            </div>
-
-            <div class="flex flex-col items-center justify-center py-6 bg-indigo-50 rounded-xl space-y-4">
-                <button onclick="playCurrentWord()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-full shadow-md transition flex items-center space-x-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
-                    </svg>
-                    <span>Повторить слово</span>
-                </button>
-            </div>
-
+        <!-- ЭКРАН 1: ПАПКИ И СЛОВА -->
+        <div id="setup-screen" class="p-6 space-y-6">
+            
+            <!-- Выбор и создание папки -->
             <div class="space-y-2">
-                <input type="text" id="user-answer" placeholder="Введите услышанное слово..." class="w-full p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-center text-lg" autocomplete="off">
-                <button onclick="submitAnswer()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition">
-                    Ответить
+                <label class="block text-sm font-semibold text-slate-700">Выберите папку:</label>
+                <div class="flex gap-2">
+                    <select id="folder-select" onchange="selectFolder()" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </select>
+                    <button onclick="createNewFolder()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3.5 py-2 rounded-xl font-semibold transition" title="Создать папку">
+                        + Папка
+                    </button>
+                    <button onclick="deleteCurrentFolder()" class="bg-rose-100 hover:bg-rose-200 text-rose-600 px-3 py-2 rounded-xl font-semibold transition" title="Удалить папку">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- Добавление слов в выбранную папку -->
+            <div class="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <label class="block text-sm font-semibold text-slate-700">Добавить слова в папку:</label>
+                <p class="text-xs text-slate-500">Вводите каждое слово с новой строки в формате: <b>слово - перевод</b></p>
+                <textarea id="bulk-input" rows="3" placeholder="apple - яблоко&#10;achieve - достигать&#10;confidence - уверенность" class="w-full p-3 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"></textarea>
+                <button onclick="addWords()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold py-2.5 rounded-xl transition">
+                    + Сохранить слова в папку
                 </button>
             </div>
-        </div>
 
-        <!-- Экран результатов -->
-        <div id="result-screen" class="space-y-4 hidden text-center">
-            <h2 class="text-xl font-bold text-slate-800">Тренировка завершена!</h2>
-            <p id="result-stats" class="text-slate-600"></p>
-            <button onclick="resetApp()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 rounded-xl transition">
-                Пройти заново
+            <!-- Список слов текущей папки -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-semibold text-slate-700">Слова в этой папке:</span>
+                    <button onclick="clearFolderWords()" class="text-xs text-rose-500 hover:underline">Очистить список</button>
+                </div>
+                <div id="words-list" class="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                    <!-- Сюда рендерятся слова -->
+                </div>
+            </div>
+
+            <hr class="border-slate-200">
+
+            <!-- Настройки тренировки -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Пауза на раздумье:</label>
+                    <select id="delay-select" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium outline-none">
+                        <option value="3">3 секунды</option>
+                        <option value="5" selected>5 секунд</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Режим диктовки:</label>
+                    <select id="mode-select" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium outline-none">
+                        <option value="once">Один круг (до конца папки)</option>
+                        <option value="loop">По кругу (пока не остановлю)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between text-sm text-slate-600 px-1">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="shuffle-check" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <span>Перемешать слова</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="show-trans-check" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <span>Показывать перевод</span>
+                </label>
+            </div>
+
+            <!-- Кнопка запуска -->
+            <button onclick="startTraining()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-200 transition text-base">
+                ▶ Начать диктант
             </button>
         </div>
+
+        <!-- ЭКРАН 2: ТРЕНИРОВКА (АКТИВНЫЙ ДИКТАНТ) -->
+        <div id="training-screen" class="p-6 space-y-6 hidden text-center">
+            <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <span id="active-folder-title">Папка №1</span>
+                <span id="progress-counter">1 / 10</span>
+            </div>
+
+            <!-- Карточка текущего слова -->
+            <div class="bg-indigo-50 border border-indigo-100 rounded-3xl p-8 space-y-3 min-h-[200px] flex flex-col justify-center items-center relative">
+                <div id="status-badge" class="text-xs font-semibold px-3 py-1 rounded-full bg-indigo-200 text-indigo-800 mb-2">
+                    Диктую...
+                </div>
+                
+                <div id="current-word-en" class="text-3xl font-extrabold text-slate-800 tracking-wide">
+                    ...
+                </div>
+                
+                <div id="current-word-ru" class="text-lg font-medium text-indigo-600">
+                    ...
+                </div>
+
+                <!-- Визуальный таймер -->
+                <div class="w-full max-w-xs mt-4">
+                    <div class="flex justify-between text-xs text-slate-500 mb-1">
+                        <span>Следующее слово через:</span>
+                        <span id="timer-seconds" class="font-bold text-indigo-600">5 с</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div id="timer-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-100" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопки управления во время диктанта -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="repeatCurrentWord()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2">
+                    🔊 Повторить слово
+                </button>
+                <button onclick="skipToNext()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2">
+                    ⏭ Следующее
+                </button>
+            </div>
+
+            <button onclick="stopTraining()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-rose-200 transition">
+                ⏹ Закончить тренировку
+            </button>
+        </div>
+
     </div>
 
-    <!-- Скрытый аудиоэлемент для резервной озвучки -->
-    <audio id="audio-player"></audio>
+    <!-- Резервный аудиоплеер (если встроенный синтезатор браузера не работает) -->
+    <audio id="fallback-audio"></audio>
 
     <script>
-        let words = [];
-        let currentIndex = 0;
-        let mistakes = 0;
+        // Инициализация данных из localStorage
+        let data = JSON.parse(localStorage.getItem('dictation_folders_v2')) || {
+            "Папка №1": [
+                { en: "apple", ru: "яблоко" },
+                { en: "journey", ru: "путешествие" },
+                { en: "knowledge", ru: "знание" }
+            ],
+            "Папка №2": [
+                { en: "developer", ru: "разработчик" },
+                { en: "success", ru: "успех" }
+            ]
+        };
 
-        function speak(text) {
-            // Сначала пробуем стандартный браузерный синтезатор
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Очищаем очередь
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'en-US';
-                utterance.rate = 0.9; // Чуть медленнее для удобства
-                
-                // Если браузер не смог сгенерировать голос, сработает ошибка -> включится Google Audio
-                utterance.onerror = () => playGoogleAudio(text);
-                
-                window.speechSynthesis.speak(utterance);
-            } else {
-                // Если API вообще нет в браузере, сразу используем Google Audio
-                playGoogleAudio(text);
-            }
+        let currentFolder = Object.keys(data)[0] || "Папка №1";
+        let trainingQueue = [];
+        let currentIndex = 0;
+        let isTraining = false;
+        let countdownInterval = null;
+        let nextWordTimeout = null;
+
+        function saveData() {
+            localStorage.setItem('dictation_folders_v2', JSON.stringify(data));
+            renderUI();
         }
 
-        function playGoogleAudio(text) {
-            const audio = document.getElementById('audio-player');
-            // Официальный публичный эндпоинт Google Translate для озвучки текста
-            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
-            audio.play().catch(err => {
-                console.error("Не удалось воспроизвести звук:", err);
-                alert("Ошибка воспроизведения звука. Проверьте интернет-соединение.");
+        function renderUI() {
+            const select = document.getElementById('folder-select');
+            select.innerHTML = '';
+            
+            const folderNames = Object.keys(data);
+            if (!folderNames.includes(currentFolder) && folderNames.length > 0) {
+                currentFolder = folderNames[0];
+            }
+
+            folderNames.forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = `${name} (${data[name].length})`;
+                if (name === currentFolder) option.selected = true;
+                select.appendChild(option);
+            });
+
+            const listContainer = document.getElementById('words-list');
+            listContainer.innerHTML = '';
+            const words = data[currentFolder] || [];
+            
+            document.getElementById('total-words-badge').textContent = `${words.length} слов`;
+
+            if (words.length === 0) {
+                listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">В этой папке пока нет слов</p>';
+                return;
+            }
+
+            words.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 text-sm';
+                div.innerHTML = `
+                    <div>
+                        <span class="font-bold text-slate-800">${item.en}</span>
+                        ${item.ru ? `<span class="text-slate-500"> — ${item.ru}</span>` : ''}
+                    </div>
+                    <button onclick="deleteWord(${index})" class="text-slate-400 hover:text-rose-500 px-2 font-bold">✕</button>
+                `;
+                listContainer.appendChild(div);
             });
         }
 
-        function startDictation() {
-            const raw = document.getElementById('words-input').value;
-            words = raw.split(/[\n,]+/).map(w => w.trim()).filter(w => w.length > 0);
+        function selectFolder() {
+            currentFolder = document.getElementById('folder-select').value;
+            renderUI();
+        }
 
-            if (words.length === 0) {
-                alert('Пожалуйста, введите хотя бы одно слово!');
+        function createNewFolder() {
+            const nextNum = Object.keys(data).length + 1;
+            const name = prompt("Введите название папки:", `Папка №${nextNum}`);
+            if (name && name.trim()) {
+                const cleanName = name.trim();
+                if (!data[cleanName]) {
+                    data[cleanName] = [];
+                }
+                currentFolder = cleanName;
+                saveData();
+            }
+        }
+
+        function deleteCurrentFolder() {
+            const keys = Object.keys(data);
+            if (keys.length <= 1) {
+                alert("Нельзя удалить последнюю папку!");
                 return;
+            }
+            if (confirm(`Удалить "${currentFolder}" и все слова в ней?`)) {
+                delete data[currentFolder];
+                currentFolder = Object.keys(data)[0];
+                saveData();
+            }
+        }
+
+        function addWords() {
+            const raw = document.getElementById('bulk-input').value.trim();
+            if (!raw) return;
+
+            const lines = raw.split('\n');
+            lines.forEach(line => {
+                if (!line.trim()) return;
+                // Разделяем по тире (- или —)
+                const parts = line.split(/[-—]/);
+                const en = parts[0].trim();
+                const ru = parts.slice(1).join('-').trim();
+                if (en) {
+                    data[currentFolder].push({ en, ru });
+                }
+            });
+
+            document.getElementById('bulk-input').value = '';
+            saveData();
+        }
+
+        function deleteWord(index) {
+            data[currentFolder].splice(index, 1);
+            saveData();
+        }
+
+        function clearFolderWords() {
+            if (confirm("Очистить все слова в текущей папке?")) {
+                data[currentFolder] = [];
+                saveData();
+            }
+        }
+
+        // --- ОЗВУЧКА С РЕЗЕРВНЫМ КАНАЛОМ ---
+        function speakWord(text, onFinishedCallback) {
+            let callbackCalled = false;
+            const safeCallback = () => {
+                if (!callbackCalled) {
+                    callbackCalled = true;
+                    if (onFinishedCallback) onFinishedCallback();
+                }
+            };
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 0.9;
+
+                utterance.onend = () => safeCallback();
+                utterance.onerror = () => playFallbackAudio(text, safeCallback);
+
+                window.speechSynthesis.speak(utterance);
+
+                // Страховка на случай, если браузер зависнет при синтезе речи
+                setTimeout(() => {
+                    if (!window.speechSynthesis.speaking && !callbackCalled) {
+                        playFallbackAudio(text, safeCallback);
+                    }
+                }, 800);
+            } else {
+                playFallbackAudio(text, safeCallback);
+            }
+        }
+
+        function playFallbackAudio(text, callback) {
+            const audio = document.getElementById('fallback-audio');
+            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=en&client=tw-ob`;
+            audio.onended = () => { if (callback) callback(); };
+            audio.onerror = () => { if (callback) callback(); };
+            audio.play().catch(() => { if (callback) callback(); });
+        }
+
+        // --- ЛОГИКА ТРЕНИРОВКИ ---
+        function startTraining() {
+            const words = data[currentFolder] || [];
+            if (words.length === 0) {
+                alert("Добавьте хотя бы одно слово в папку перед началом!");
+                return;
+            }
+
+            trainingQueue = [...words];
+            if (document.getElementById('shuffle-check').checked) {
+                trainingQueue.sort(() => Math.random() - 0.5);
             }
 
             currentIndex = 0;
-            mistakes = 0;
+            isTraining = true;
 
             document.getElementById('setup-screen').classList.add('hidden');
-            document.getElementById('dictation-screen').classList.remove('hidden');
+            document.getElementById('training-screen').classList.remove('hidden');
+            document.getElementById('active-folder-title').textContent = currentFolder;
 
-            nextWord();
+            runStep();
         }
 
-        function nextWord() {
-            if (currentIndex >= words.length) {
-                showResults();
-                return;
+        function runStep() {
+            if (!isTraining) return;
+            clearTimers();
+
+            const mode = document.getElementById('mode-select').value;
+            if (currentIndex >= trainingQueue.length) {
+                if (mode === 'loop') {
+                    currentIndex = 0;
+                    if (document.getElementById('shuffle-check').checked) {
+                        trainingQueue.sort(() => Math.random() - 0.5);
+                    }
+                } else {
+                    alert("Тренировка завершена! Все слова продиктованы.");
+                    stopTraining();
+                    return;
+                }
             }
 
-            document.getElementById('progress-text').innerText = `Слово ${currentIndex + 1} из ${words.length}`;
-            document.getElementById('score-text').innerText = `Ошибок: ${mistakes}`;
-            document.getElementById('user-answer').value = '';
+            const item = trainingQueue[currentIndex];
+            const showTrans = document.getElementById('show-trans-check').checked;
+            const delaySec = parseInt(document.getElementById('delay-select').value, 10);
+
+            document.getElementById('progress-counter').textContent = `${currentIndex + 1} / ${trainingQueue.length}`;
+            document.getElementById('status-badge').textContent = "Слушайте слово...";
+            document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-indigo-200 text-indigo-800 mb-2";
             
-            playCurrentWord();
-            document.getElementById('user-answer').focus();
+            document.getElementById('current-word-en').textContent = item.en;
+            document.getElementById('current-word-ru').textContent = (showTrans && item.ru) ? item.ru : "";
+            
+            document.getElementById('timer-seconds').textContent = `${delaySec} с`;
+            document.getElementById('timer-bar').style.width = '100%';
+
+            // Произносим слово, и как только диктор закончит — запускаем таймер на раздумье
+            speakWord(item.en, () => {
+                if (!isTraining) return;
+                startPauseTimer(delaySec);
+            });
         }
 
-        function playCurrentWord() {
-            if (words[currentIndex]) {
-                speak(words[currentIndex]);
-            }
+        function startPauseTimer(seconds) {
+            document.getElementById('status-badge').textContent = "Время подумать / записать...";
+            document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-amber-200 text-amber-800 mb-2";
+
+            const totalMs = seconds * 1000;
+            const startTime = Date.now();
+
+            countdownInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const remaining = Math.max(0, totalMs - elapsed);
+                const percent = (remaining / totalMs) * 100;
+
+                document.getElementById('timer-bar').style.width = `${percent}%`;
+                document.getElementById('timer-seconds').textContent = `${Math.ceil(remaining / 1000)} с`;
+
+                if (remaining <= 0) {
+                    clearInterval(countdownInterval);
+                    currentIndex++;
+                    runStep();
+                }
+            }, 100);
         }
 
-        function submitAnswer() {
-            const userInput = document.getElementById('user-answer').value.trim().toLowerCase();
-            const targetWord = words[currentIndex].toLowerCase();
+        function repeatCurrentWord() {
+            if (!isTraining) return;
+            clearTimers();
+            const item = trainingQueue[currentIndex];
+            const delaySec = parseInt(document.getElementById('delay-select').value, 10);
+            
+            document.getElementById('status-badge').textContent = "Повторяю...";
+            speakWord(item.en, () => {
+                if (isTraining) startPauseTimer(delaySec);
+            });
+        }
 
-            if (userInput !== targetWord) {
-                mistakes++;
-                alert(`Неверно! Правильно: "${words[currentIndex]}"`);
-            }
-
+        function skipToNext() {
+            if (!isTraining) return;
+            clearTimers();
             currentIndex++;
-            nextWord();
+            runStep();
         }
 
-        function showResults() {
-            document.getElementById('dictation-screen').classList.add('hidden');
-            document.getElementById('result-screen').classList.remove('hidden');
-            document.getElementById('result-stats').innerText = `Вы прошли все слова. Допущено ошибок: ${mistakes}.`;
+        function clearTimers() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (nextWordTimeout) clearTimeout(nextWordTimeout);
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            const audio = document.getElementById('fallback-audio');
+            audio.pause();
         }
 
-        function resetApp() {
-            document.getElementById('result-screen').classList.add('hidden');
+        function stopTraining() {
+            isTraining = false;
+            clearTimers();
+            document.getElementById('training-screen').classList.add('hidden');
             document.getElementById('setup-screen').classList.remove('hidden');
         }
 
-        // Поддержка нажатия Enter для отправки ответа
-        document.getElementById('user-answer').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                submitAnswer();
-            }
-        });
+        // Запуск при загрузке страницы
+        renderUI();
     </script>
 </body>
 </html>
