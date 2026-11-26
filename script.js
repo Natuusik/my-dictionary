@@ -40,6 +40,30 @@ async function initSupabase() {
     }
 }
 
+// Функция для получения выбранного голоса
+function getCurrentVoiceType() {
+    const select = document.getElementById('voiceSelect');
+    return select ? select.value : 'pro'; // по умолчанию 'pro' (мужской)
+}
+
+// Функция воспроизведения аудио слова с учетом выбранного голоса
+function playWordAudio(wordItem) {
+    const voiceType = getCurrentVoiceType(); // 'pro' или 'female'
+    
+    let audioUrl = '';
+    
+    if (voiceType === 'female') {
+        audioUrl = wordItem.audioRuFemaleUrl; // Женская версия
+    } else {
+        audioUrl = wordItem.audioRuUrl; // Мужская версия (основная)
+    }
+    
+    if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.play().catch(e => console.log("Ошибка воспроизведения:", e));
+    }
+}
+
 // Загрузка всех слов и папок из таблицы Supabase
 async function loadFromDatabase() {
     if (!supabaseClient) return;
@@ -65,7 +89,8 @@ async function loadFromDatabase() {
                 en: row.word_en,
                 ru: row.word_ru || '',
                 audioEnUrl: row.audio_en_url,
-                audioRuUrl: row.audio_ru_url
+                audioRuUrl: row.audio_ru_url,
+                audioRuFemaleUrl: row.audio_ru_female_url // Поддержка женской озвучки
             });
         });
         foldersMap = grouped;
@@ -227,7 +252,6 @@ function getAudioUrl(text, langCode, customUrl) {
     if (customUrl) return customUrl;
     return `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${langCode}&q=${encodeURIComponent(text)}`;
 }
-
 function preloadAudio(text, langCode, customUrl = null) {
     if (!text || text === '—') return;
     const key = customUrl || `${langCode}:${text.toLowerCase()}`;
@@ -372,7 +396,15 @@ function runStep() {
     
     const answerText = direction === 'en-ru' ? (item.ru || '—') : item.en;
     const answerLang = direction === 'en-ru' ? 'ru' : 'en';
-    const answerUrl = direction === 'en-ru' ? item.audioRuUrl : item.audioEnUrl;
+    
+    // Выбираем правильный URL для русской озвучки с учетом выбранного голоса
+    let answerUrl = '';
+    if (direction === 'en-ru') {
+        const voiceType = getCurrentVoiceType();
+        answerUrl = (voiceType === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
+    } else {
+        answerUrl = item.audioEnUrl;
+    }
 
     setTimeout(() => preloadAudio(answerText, answerLang, answerUrl), 400);
 
