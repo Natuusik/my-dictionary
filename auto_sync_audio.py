@@ -21,7 +21,7 @@ async def generate_and_upload():
         print("❌ В таблице words_dictation вообще нет записей!")
         return
 
-    print(لнекс) # Найдено слов: {len(words)}")
+    print(f"Найдено слов: {len(words)}")
     os.makedirs("temp_audio", exist_ok=True)
     
     for row in words:
@@ -34,7 +34,6 @@ async def generate_and_upload():
         
         updates = {}
         
-        # Принудительно генерируем английский, если ссылки нет или она пустая
         if not audio_en_url and word_en:
             print(f"🎙 Генерируем EN для слова: {word_en}")
             filename_en = f"en_audio_pro/en_{word_id}.mp3"
@@ -51,7 +50,6 @@ async def generate_and_upload():
             except Exception as e:
                 print(f"❌ Ошибка EN для {word_en}: {e}")
                 
-        # Принудительно генерируем русский, если ссылки нет или она пустая
         if not audio_ru_url and word_ru:
             print(f"🎙 Генерируем RU для слова: {word_ru}")
             filename_ru = f"ru_audio_pro/ru_{word_id}.mp3"
