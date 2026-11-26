@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>Cloud Аудио-тренажёр (Supabase)</title>
+    <!-- Tailwind CSS для красивого дизайна -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Официальный клиент Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Подключаем наш файл стилей -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+
+    <div class="w-full max-w-xl bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+        <!-- Шапка -->
+        <div class="bg-emerald-700 p-5 text-white flex justify-between items-center">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xl font-bold">Cloud Тренажёр (EN ⇄ RU)</h1>
+                    <span id="db-status" class="text-[10px] bg-emerald-900 text-emerald-200 px-2 py-0.5 rounded-full">Подключение...</span>
+                </div>
+                <p class="text-emerald-100 text-xs">Синхронизация с Supabase + HD озвучка</p>
+            </div>
+            <button onclick="testAudio()" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 py-2 rounded-xl font-semibold transition flex items-center gap-1 shadow-sm border border-emerald-500">
+                🔊 Тест голоса
+            </button>
+        </div>
+
+        <!-- ЭКРАН 1: ПАПКИ И НАСТРОЙКИ -->
+        <div id="setup-screen" class="p-6 space-y-5">
+            
+            <!-- Выбор и создание папки -->
+            <div class="space-y-2">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700">Облачные папки:</label>
+                    <span id="total-words-badge" class="text-xs text-slate-500 font-medium">Загрузка...</span>
+                </div>
+                <div class="flex gap-2">
+                    <select id="folder-select" onchange="selectFolder()" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </select>
+                    <button onclick="createNewFolder()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3.5 py-2 rounded-xl font-semibold transition" title="Создать папку">
+                        + Папка
+                    </button>
+                    <button onclick="deleteCurrentFolder()" class="bg-rose-100 hover:bg-rose-200 text-rose-600 px-3 py-2 rounded-xl font-semibold transition" title="Удалить папку">
+                        ✕
+                    </button>
+                </div>
+            </div>
+
+            <!-- Добавление слов -->
+            <div class="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <label class="block text-sm font-semibold text-slate-700">Добавить слова в облако:</label>
+                <p class="text-xs text-slate-500">Формат: <b>английское слово - русский перевод</b> (каждое с новой строки)</p>
+                <textarea id="bulk-input" rows="3" placeholder="apple - яблоко
+achieve - достигать
+confidence - уверенность" class="w-full p-3 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"></textarea>
+                <button id="save-btn" onclick="addWords()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold py-2.5 rounded-xl transition">
+                    ☁️ Сохранить в Supabase
+                </button>
+            </div>
+
+            <!-- Список слов текущей папки -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-semibold text-slate-700">Слова в этой папке:</span>
+                    <button onclick="clearFolderWords()" class="text-xs text-rose-500 hover:underline">Очистить папку</button>
+                </div>
+                <div id="words-list" class="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                </div>
+            </div>
+
+            <hr class="border-slate-200">
+
+            <!-- Направление перевода -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Направление диктовки:</label>
+                <select id="direction-select" class="w-full p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-sm font-bold outline-none">
+                    <option value="en-ru">🇬🇧 Английский ➔ 🇷🇺 Русский (сначала EN, через паузу RU)</option>
+                    <option value="ru-en">🇷🇺 Русский ➔ 🇬🇧 Английский (сначала RU, через паузу EN)</option>
+                </select>
+            </div>
+
+            <!-- Пауза и режим цикла -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Пауза на раздумье:</label>
+                    <select id="delay-select" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium outline-none">
+                        <option value="3">3 секунды</option>
+                        <option value="5" selected>5 секунд</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Повторение списка:</label>
+                    <select id="mode-select" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium outline-none">
+                        <option value="once">Один круг (до конца папки)</option>
+                        <option value="loop">По кругу (пока не остановлю)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between text-sm text-slate-600 px-1">
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="shuffle-check" class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                    <span>Перемешать слова</span>
+                </label>
+                <label class="flex items-center space-x-2 cursor-pointer">
+                    <input type="checkbox" id="hide-answer-check" checked class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
+                    <span>Скрывать ответ до озвучки</span>
+                </label>
+            </div>
+
+            <!-- Кнопка запуска -->
+            <button onclick="startTraining()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-emerald-200 transition text-base">
+                ▶ Начать тренировку
+            </button>
+        </div>
+
+        <!-- ЭКРАН 2: ТРЕНИРОВКА -->
+        <div id="training-screen" class="p-6 space-y-6 hidden text-center">
+            <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <span id="active-folder-title">Папка №1</span>
+                <span id="direction-badge" class="text-emerald-600">EN ➔ RU</span>
+                <span id="progress-counter">1 / 10</span>
+            </div>
+
+            <!-- Карточка текущего слова -->
+            <div class="bg-emerald-50/70 border border-emerald-100 rounded-3xl p-8 space-y-4 min-h-[230px] flex flex-col justify-center items-center relative">
+                <div id="status-badge" class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-200 text-emerald-900">
+                    Слушайте слово...
+                </div>
+                
+                <div id="prompt-word" class="text-3xl font-extrabold text-slate-800 tracking-wide">
+                    ...
+                </div>
+                
+                <div id="answer-word" class="text-xl font-bold text-emerald-600 transition-all duration-300 min-h-[28px]">
+                    ...
+                </div>
+
+                <!-- Визуальный таймер -->
+                <div class="w-full max-w-xs pt-2">
+                    <div class="flex justify-between text-xs text-slate-500 mb-1">
+                        <span id="timer-label">Ответ через:</span>
+                        <span id="timer-seconds" class="font-bold text-emerald-700">5 с</span>
+                    </div>
+                    <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div id="timer-bar" class="bg-emerald-600 h-2 rounded-full transition-all duration-100" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопки управления -->
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="repeatCurrentWord()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2">
+                    🔊 Повторить пару
+                </button>
+                <button onclick="skipToNext()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-xl transition flex items-center justify-center gap-2">
+                    ⏭ Следующее
+                </button>
+            </div>
+
+            <button onclick="stopTraining()" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-rose-200 transition">
+                ⏹ Закончить тренировку
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Подключаем наш файл логики JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
