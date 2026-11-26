@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Двусторонний аудио-тренажёр</title>
+    <title>Аудио-тренажёр (EN ⇄ RU)</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
@@ -155,8 +155,9 @@
 
     </div>
 
-    <!-- Резервный аудиоплеер -->
-    <audio id="fallback-audio"></audio>
+    <!-- Аудиоплееры для гарантированной озвучки -->
+    <audio id="audio-en"></audio>
+    <audio id="audio-ru"></audio>
 
     <script>
         let data = JSON.parse(localStorage.getItem('dictation_folders_v3')) || {
@@ -287,54 +288,40 @@
             }
         }
 
-        // --- ДВУЯЗЫЧНАЯ ОЗВУЧКА (EN / RU) С РЕЗЕРВНЫМ КАНАЛОМ ---
+        // --- ГАРАНТИРОВАННАЯ ОЗВУЧКА GOOGLE AUDIO ДЛЯ EN И RU ---
         function speakText(text, langCode, onFinishedCallback) {
             if (!text) {
                 if (onFinishedCallback) onFinishedCallback();
                 return;
             }
 
-            let callbackCalled = false;
-            const safeCallback = () => {
-                if (!callbackCalled) {
-                    callbackCalled = true;
+            // Используем официальный онлайн-поток Google Translate отдельно для каждого языка ('en' или 'ru')
+            const audioId = langCode === 'ru' ? 'audio-ru' : 'audio-en';
+            const audio = document.getElementById(audioId);
+            
+            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langCode}&client=tw-ob`;
+            
+            let finished = false;
+            const done = () => {
+                if (!finished) {
+                    finished = true;
                     if (onFinishedCallback) onFinishedCallback();
                 }
             };
 
-            const fullLang = langCode === 'ru' ? 'ru-RU' : 'en-US';
+            audio.onended = done;
+            audio.onerror = done;
 
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = fullLang;
-                utterance.rate = 0.9;
+            audio.play().catch(err => {
+                console.warn("Ошибка воспроизведения аудио:", err);
+                done();
+            });
 
-                utterance.onend = () => safeCallback();
-                utterance.onerror = () => playFallbackAudio(text, langCode, safeCallback);
-
-                window.speechSynthesis.speak(utterance);
-
-                // Страховка на случай, если браузер не запустит встроенный синтезатор
-                setTimeout(() => {
-                    if (!window.speechSynthesis.speaking && !callbackCalled) {
-                        playFallbackAudio(text, langCode, safeCallback);
-                    }
-                }, 800);
-            } else {
-                playFallbackAudio(text, langCode, safeCallback);
-            }
+            // Страховка на случай задержки сети
+            setTimeout(done, 4000);
         }
 
-        function playFallbackAudio(text, langCode, callback) {
-            const audio = document.getElementById('fallback-audio');
-            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langCode}&client=tw-ob`;
-            audio.onended = () => { if (callback) callback(); };
-            audio.onerror = () => { if (callback) callback(); };
-            audio.play().catch(() => { if (callback) callback(); });
-        }
-
-        // --- ЛОГИКА ДВУСТОРОННЕЙ ТРЕНИРОВКИ ---
+        // --- ЛОГИКА ТРЕНИРОВКИ ---
         function startTraining() {
             const words = data[currentFolder] || [];
             if (words.length === 0) {
@@ -383,14 +370,12 @@
             const hideAnswer = document.getElementById('hide-answer-check').checked;
             const delaySec = parseInt(document.getElementById('delay-select').value, 10);
 
-            // Определяем, что является вопросом, а что ответом
             const promptText = direction === 'en-ru' ? item.en : (item.ru || item.en);
             const promptLang = direction === 'en-ru' ? 'en' : 'ru';
             
             const answerText = direction === 'en-ru' ? (item.ru || '—') : item.en;
             const answerLang = direction === 'en-ru' ? 'ru' : 'en';
 
-            // Обновляем интерфейс
             document.getElementById('progress-counter').textContent = `${currentIndex + 1} / ${trainingQueue.length}`;
             document.getElementById('status-badge').textContent = "1. Слушайте слово...";
             document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-indigo-200 text-indigo-800";
@@ -410,10 +395,10 @@
             document.getElementById('timer-bar').style.width = '100%';
             document.getElementById('timer-bar').className = "bg-indigo-600 h-2 rounded-full transition-all duration-100";
 
-            // Шаг 1: Озвучиваем слово-вопрос
+            // Шаг 1: Озвучиваем вопрос
             speakText(promptText, promptLang, () => {
                 if (!isTraining) return;
-                // Шаг 2: Запускаем таймер на раздумье (3 или 5 сек)
+                // Шаг 2: Таймер на раздумье
                 startThinkTimer(delaySec, answerText, answerLang);
             });
         }
@@ -435,7 +420,7 @@
 
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
-                    // Шаг 3: Показываем и озвучиваем перевод
+                    // Шаг 3: Показываем и озвучиваем перевод (включая русский)
                     revealAndSpeakAnswer(answerText, answerLang);
                 }
             }, 100);
@@ -449,13 +434,11 @@
             document.getElementById('timer-label').textContent = "Следующее слово...";
             document.getElementById('timer-seconds').textContent = "";
 
-            // Снимаем размытие с ответа
             const answerEl = document.getElementById('answer-word');
             answerEl.classList.remove('blur-sm', 'select-none', 'opacity-40');
 
             speakText(answerText, answerLang, () => {
                 if (!isTraining) return;
-                // Небольшая пауза 1.5 секунды после озвучки ответа перед следующим словом
                 nextStepTimeout = setTimeout(() => {
                     currentIndex++;
                     runStep();
@@ -478,9 +461,8 @@
         function clearTimers() {
             if (countdownInterval) clearInterval(countdownInterval);
             if (nextStepTimeout) clearTimeout(nextStepTimeout);
-            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-            const audio = document.getElementById('fallback-audio');
-            audio.pause();
+            document.getElementById('audio-en').pause();
+            document.getElementById('audio-ru').pause();
         }
 
         function stopTraining() {
