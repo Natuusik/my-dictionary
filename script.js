@@ -18,34 +18,6 @@ let nextStepTimeout = null;
 const audioCache = new Map();
 let activeAudio = null;
 
-// --- СИНХРОНИЗАЦИЯ С GITHUB ---
-async function triggerInstantSync() {
-    const GITHUB_USERNAME = 'Natuusik';
-    const REPO_NAME = 'my-dictionary';
-    const TOKEN = 'ваш_токен_сюда'; // Тот самый токен, который вы создали в настройках GitHub
-
-    try {
-        const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/dispatches`, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/vnd.github+json',
-                'Authorization': `Bearer ${TOKEN}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ event_type: 'trigger-sync' })
-        });
-
-        if (response.ok) {
-            alert("🚀 Сигнал отправлен! Озвучка сгенерируется через 10–15 секунд. Обновите страницу.");
-        } else {
-            alert("Ошибка при запуске синхронизации.");
-        }
-    } catch (err) {
-        console.error(err);
-        alert("Не удалось связаться с GitHub API.");
-    }
-}
-
 // --- БУФЕР ОБМЕНА И ПЕРЕВОД ---
 async function pasteFromClipboard(elementId) {
     try {
@@ -54,7 +26,6 @@ async function pasteFromClipboard(elementId) {
         if (el) el.value = text;
     } catch (err) {
         console.error("Не удалось прочитать буфер обмена:", err);
-        alert("Разрешите доступ к буферу обмена в браузере.");
     }
 }
 
@@ -64,13 +35,12 @@ async function translateWord() {
     const text = textInput ? textInput.value.trim() : '';
 
     if (!text) {
-        alert("Сначала введите английское слово или фразу для перевода!");
+        alert("Сначала введите слово для перевода!");
         return;
     }
 
     try {
         if (targetInput) targetInput.placeholder = "Переводим...";
-        
         const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`);
         const data = await response.json();
         
@@ -81,8 +51,7 @@ async function translateWord() {
         }
     } catch (err) {
         console.error("Ошибка перевода:", err);
-        alert("Ошибка соединения с сервисом перевода.");
-        if (targetInput) targetInput.placeholder = "Перевод...";
+        if (targetInput) targetInput.placeholder = "Ошибка перевода";
     }
 }
 
@@ -102,7 +71,7 @@ async function initSupabase() {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         await loadFromDatabase();
         
-        // Восстанавливаем настройки пользователя из localStorage после загрузки базы
+        // Восстанавливаем настройки из памяти браузера после загрузки БД
         loadUserSettings();
 
         if (statusBadge) {
@@ -127,7 +96,7 @@ async function loadFromDatabase() {
         .order('created_at', { ascending: true });
 
     if (error) {
-        alert("Ошибка загрузки из Supabase: " + error.message);
+        console.error("Ошибка загрузки из Supabase:", error.message);
         return;
     }
 
@@ -148,7 +117,7 @@ async function loadFromDatabase() {
         });
         foldersMap = grouped;
         
-        // Если сохраненная папка существует в базе, оставляем её, иначе берем первую
+        // Восстанавливаем папку, если она есть в базе
         const savedFolder = localStorage.getItem('user_folder');
         if (savedFolder && foldersMap[savedFolder]) {
             currentFolder = savedFolder;
@@ -249,10 +218,13 @@ async function deleteCurrentFolder() {
     renderUI();
 }
 
-// Сохранение одиночного слова из новой формы
+// --- СОХРАНЕНИЕ СЛОВ (Одиночное слово из новой формы) ---
 async function addNewSingleWord() {
-    const englishWord = document.getElementById('sourceWord').value.trim();
-    const russianWord = document.getElementById('targetWord').value.trim();
+    const englishInput = document.getElementById('sourceWord');
+    const russianInput = document.getElementById('targetWord');
+    
+    const englishWord = englishInput ? englishInput.value.trim() : '';
+    const russianWord = russianInput ? russianInput.value.trim() : '';
 
     if (!englishWord || !russianWord) {
         alert("Пожалуйста, заполните оба поля: и слово, и перевод!");
@@ -273,28 +245,23 @@ async function addNewSingleWord() {
         if (error) {
             alert("Ошибка сохранения: " + error.message);
         } else {
+            // Очищаем поля ввода
+            if (englishInput) englishInput.value = '';
+            if (russianInput) russianInput.value = '';
             await loadFromDatabase();
-            document.getElementById('sourceWord').value = '';
-            document.getElementById('targetWord').value = '';
         }
     } else {
-        foldersMap[currentFolder].push({ id: Date.now() + Math.random(), en: englishWord, ru: russianWord });
-        document.getElementById('sourceWord').value = '';
-        document.getElementById('targetWord').value = '';
+        foldersMap[currentFolder].push({ id: Date.now(), en: englishWord, ru: russianWord });
+        if (englishInput) englishInput.value = '';
+        if (russianInput) russianInput.value = '';
         renderUI();
     }
 }
 
-// Сохранение пакета слов (если используется старое поле bulk-input)
+// Сохранение списком (если используется старое поле bulk-input)
 async function addWords() {
-    const raw = document.getElementById('bulk-input').value.trim();
+    const raw = document.getElementById('bulk-input') ? document.getElementById('bulk-input').value.trim() : '';
     if (!raw) return;
-
-    const btn = document.getElementById('save-btn');
-    if (btn) {
-        btn.textContent = "⏳ Сохранение в облако...";
-        btn.disabled = true;
-    }
 
     const lines = raw.split('\n');
     const rowsToInsert = [];
@@ -313,30 +280,17 @@ async function addWords() {
         }
     });
 
-    if (rowsToInsert.length > 0) {
-        if (supabaseClient) {
-            const { error } = await supabaseClient
-                .from('words_dictation')
-                .insert(rowsToInsert);
-            
-            if (error) {
-                alert("Ошибка сохранения: " + error.message);
-            } else {
-                await loadFromDatabase();
-            }
+    if (rowsToInsert.length > 0 && supabaseClient) {
+        const { error } = await supabaseClient
+            .from('words_dictation')
+            .insert(rowsToInsert);
+        
+        if (error) {
+            alert("Ошибка сохранения: " + error.message);
         } else {
-            rowsToInsert.forEach(r => {
-                foldersMap[currentFolder].push({ id: Date.now() + Math.random(), en: r.word_en, ru: r.word_ru });
-            });
-            renderUI();
+            document.getElementById('bulk-input').value = '';
+            await loadFromDatabase();
         }
-    }
-
-    const bulkInput = document.getElementById('bulk-input');
-    if (bulkInput) bulkInput.value = '';
-    if (btn) {
-        btn.textContent = "☁️ Сохранить в Supabase";
-        btn.disabled = false;
     }
 }
 
@@ -658,7 +612,7 @@ function stopTraining() {
     if (setupScreen) setupScreen.classList.remove('hidden');
 }
 
-// --- СОХРАНЕНИЕ И ВОССТАНОВЛЕНИЕ НАСТРОЕК В БРАУЗЕРЕ ---
+// --- СОХРАНЕНИЕ И ВОССТАНОВЛЕНИЕ НАСТРОЕК ---
 function saveUserSettings() {
     const folderSelect = document.getElementById('folder-select');
     const voiceSelect = document.getElementById('voiceSelect');
@@ -716,7 +670,7 @@ function loadUserSettings() {
     }
 }
 
-// Автоматически сохранять настройки при их изменении в интерфейсе
+// Автоматически сохранять настройки при изменениях
 document.addEventListener('change', (event) => {
     if (['folder-select', 'voiceSelect', 'direction-select', 'delay-select', 'mode-select', 'shuffle-check', 'hide-answer-check'].includes(event.target.id)) {
         saveUserSettings();
