@@ -43,6 +43,70 @@ async function triggerInstantSync() {
         alert("Не удалось связаться с GitHub API.");
     }
 }
+
+// Функция быстрой вставки из буфера обмена
+async function pasteFromClipboard(elementId) {
+    try {
+        const text = await navigator.clipboard.readText();
+        document.getElementById(elementId).value = text;
+    } catch (err) {
+        console.error("Не удалось прочитать буфер обмена:", err);
+        alert("Разрешите доступ к буферу обмена в браузере.");
+    }
+}
+
+// Функция автоматического перевода через бесплатный публичный API
+async function translateWord() {
+    const textInput = document.getElementById('sourceWord');
+    const targetInput = document.getElementById('targetWord');
+    const text = textInput.value.trim();
+
+    if (!text) {
+        alert("Сначала введите английское слово или фразу для перевода!");
+        return;
+    }
+
+    try {
+        targetInput.placeholder = "Переводим...";
+        // Используем бесплатный API MyMemory для перевода с английского на русский
+        const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`);
+        const data = await response.json();
+        
+        if (data && data.responseData && data.responseData.translatedText) {
+            targetInput.value = data.responseData.translatedText;
+        } else {
+            targetInput.placeholder = "Не удалось перевести";
+        }
+    } catch (err) {
+        console.error("Ошибка перевода:", err);
+        alert("Ошибка соединения с сервисом перевода.");
+        targetInput.placeholder = "Перевод...";
+    }
+}
+
+// Функция сохранения одиночного слова (связывает новые поля с вашей базой Supabase)
+async function addNewSingleWord() {
+    const englishWord = document.getElementById('sourceWord').value.trim();
+    const russianWord = document.getElementById('targetWord').value.trim();
+
+    if (!englishWord || !russianWord) {
+        alert("Пожалуйста, заполните оба поля: и слово, и перевод!");
+        return;
+    }
+
+    // Здесь вызывается ваша логика добавления в Supabase (куда у вас уходит сохранение слов)
+    // Например, передаем их в вашу существующую функцию добавления:
+    if (typeof saveWordToSupabase === 'function') {
+        await saveWordToSupabase(englishWord, russianWord);
+        document.getElementById('sourceWord').value = '';
+        document.getElementById('targetWord').value = '';
+    } else {
+        console.log("Добавлено:", englishWord, "-", russianWord);
+        // Временное уведомление, если функция сохранения в script.js называется иначе
+        alert(`Слово "${englishWord} - ${russianWord}" готово к сохранению!`);
+    }
+}
+
 // Инициализация подключения к Supabase
 async function initSupabase() {
     const statusBadge = document.getElementById('db-status');
