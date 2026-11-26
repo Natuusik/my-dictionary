@@ -589,5 +589,36 @@ function stopTraining() {
     document.getElementById('setup-screen').classList.remove('hidden');
 }
 
+
 // Запуск инициализации при открытии страницы
 initSupabase();
+
+// Функция автоматического перевода через бесплатный публичный API
+async function translateWord() {
+    const textInput = document.getElementById('sourceWord');
+    const targetInput = document.getElementById('targetWord');
+    const text = textInput ? textInput.value.trim() : '';
+
+    if (!text) {
+        alert("Сначала введите английское слово или фразу для перевода!");
+        return;
+    }
+
+    try {
+        if (targetInput) targetInput.placeholder = "Переводим...";
+        
+        // Запрос к бесплатному сервису перевода MyMemory
+        const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`);
+        const data = await response.json();
+        
+        if (data && data.responseData && data.responseData.translatedText) {
+            if (targetInput) targetInput.value = data.responseData.translatedText;
+        } else {
+            if (targetInput) targetInput.placeholder = "Не удалось перевести";
+        }
+    } catch (err) {
+        console.error("Ошибка перевода:", err);
+        alert("Ошибка соединения с сервисом перевода.");
+        if (targetInput) targetInput.placeholder = "Перевод...";
+    }
+}
