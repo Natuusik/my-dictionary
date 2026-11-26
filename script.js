@@ -622,3 +622,64 @@ async function translateWord() {
         if (targetInput) targetInput.placeholder = "Перевод...";
     }
 }
+// --- СОХРАНЕНИЕ И ВОССТАНОВЛЕНИЕ НАСТРОЕК В БРАУЗЕРЕ ---
+
+function saveUserSettings() {
+    const folderSelect = document.getElementById('folder-select');
+    const voiceSelect = document.getElementById('voiceSelect');
+    const directionSelect = document.getElementById('direction-select');
+    const delaySelect = document.getElementById('delay-select');
+    const modeSelect = document.getElementById('mode-select');
+    const shuffleCheck = document.getElementById('shuffle-check');
+    const hideAnswerCheck = document.getElementById('hide-answer-check');
+
+    if (folderSelect) localStorage.setItem('user_folder', folderSelect.value);
+    if (voiceSelect) localStorage.setItem('user_voice', voiceSelect.value);
+    if (directionSelect) localStorage.setItem('user_direction', directionSelect.value);
+    if (delaySelect) localStorage.setItem('user_delay', delaySelect.value);
+    if (modeSelect) localStorage.setItem('user_mode', modeSelect.value);
+    if (shuffleCheck) localStorage.setItem('user_shuffle', shuffleCheck.checked);
+    if (hideAnswerCheck) localStorage.setItem('user_hide_answer', hideAnswerCheck.checked);
+}
+
+function loadUserSettings() {
+    try {
+        if (localStorage.getItem('user_folder')) {
+            const el = document.getElementById('folder-select');
+            if (el) el.value = localStorage.getItem('user_folder');
+        }
+        if (localStorage.getItem('user_voice')) {
+            const el = document.getElementById('voiceSelect');
+            if (el) el.value = localStorage.getItem('user_voice');
+        }
+        if (localStorage.getItem('user_direction')) {
+            const el = document.getElementById('direction-select');
+            if (el) el.value = localStorage.getItem('user_direction');
+        }
+        if (localStorage.getItem('user_delay')) {
+            const el = document.getElementById('delay-select');
+            if (el) el.value = localStorage.getItem('user_delay');
+        }
+        if (localStorage.getItem('user_mode')) {
+            const el = document.getElementById('mode-select');
+            if (el) el.value = localStorage.getItem('user_mode');
+        }
+        if (localStorage.getItem('user_shuffle') !== null) {
+            const el = document.getElementById('shuffle-check');
+            if (el) el.checked = localStorage.getItem('user_shuffle') === 'true';
+        }
+        if (localStorage.getItem('user_hide_answer') !== null) {
+            const el = document.getElementById('hide-answer-check');
+            if (el) el.checked = localStorage.getItem('user_hide_answer') === 'true';
+        }
+    } catch (e) {
+        console.error("Ошибка загрузки настроек:", e);
+    }
+}
+
+// Автоматически сохранять настройки при их изменении
+document.addEventListener('change', (event) => {
+    if (['folder-select', 'voiceSelect', 'direction-select', 'delay-select', 'mode-select', 'shuffle-check', 'hide-answer-check'].includes(event.target.id)) {
+        saveUserSettings();
+    }
+});
