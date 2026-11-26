@@ -1,8 +1,8 @@
 // =====================================================================
 // ВСТАВЬТЕ ВАШИ ДАННЫЕ ИЗ SUPABASE (Project Settings -> API)
 // =====================================================================
-const SUPABASE_URL = 'https://ВАШ_ПРОЕКТ.supabase.co';
-const SUPABASE_KEY = 'ВАШ_ANON_PUBLIC_KEY';
+const SUPABASE_URL = 'https://sb_publishable_buNcB1Gf3j4R0z68CwTSgQ__WHMuxFY.supabase.co';
+const SUPABASE_KEY = 'oxinddpmnblggssmcpbc';
 // =====================================================================
 
 let supabaseClient = null;
