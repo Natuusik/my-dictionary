@@ -36,12 +36,14 @@ async def generate_and_upload():
         
         updates = {}
         
-        # 1. Английский
-        if not audio_en_url and word_en:
-            print(f"🎙 Генерируем EN: {word_en}")
-            filename_en = f"en_audio_pro/en_{word_id}.mp3"
-            local_path_en = os.path.join("temp_audio", f"en_{word_id}.mp3")
-            try:
+        # Обрабатываем каждое слово с защитой от сбоев
+        try:
+            # 1. Английский
+            if not audio_en_url and word_en:
+                print(f"🎙 Генерируем EN: {word_en}")
+                filename_en = f"en_audio_pro/en_{word_id}.mp3"
+                local_path_en = os.path.join("temp_audio", f"en_{word_id}.mp3")
+                
                 communicate = edge_tts.Communicate(word_en, VOICE_EN)
                 await communicate.save(local_path_en)
                 with open(local_path_en, "rb") as f:
@@ -49,15 +51,13 @@ async def generate_and_upload():
                         path=filename_en, file=f, file_options={"upsert": "true"}
                     )
                 updates["audio_en_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_en)
-            except Exception as e:
-                print(f"❌ Ошибка EN: {e}")
+                    
+            # 2. Русский (Мужской)
+            if not audio_ru_url and word_ru:
+                print(f"🎙 Генерируем RU (мужской) для: {word_ru}")
+                filename_ru = f"ru_audio_pro/ru_{word_id}.mp3"
+                local_path_ru = os.path.join("temp_audio", f"ru_{word_id}.mp3")
                 
-        # 2. Русский (Мужской)
-        if not audio_ru_url and word_ru:
-            print(f"🎙 Генерируем RU (мужской) для: {word_ru}")
-            filename_ru = f"ru_audio_pro/ru_{word_id}.mp3"
-            local_path_ru = os.path.join("temp_audio", f"ru_{word_id}.mp3")
-            try:
                 communicate = edge_tts.Communicate(word_ru, VOICE_RU_MALE)
                 await communicate.save(local_path_ru)
                 with open(local_path_ru, "rb") as f:
@@ -65,28 +65,34 @@ async def generate_and_upload():
                         path=filename_ru, file=f, file_options={"upsert": "true"}
                     )
                 updates["audio_ru_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_ru)
-            except Exception as e:
-                print(f"❌ Ошибка RU мужской: {e}")
 
-        # 3. Русский (Женский)
-        if not audio_ru_female_url and word_ru:
-            print(f"🎙 Генерируем RU (женский) для: {word_ru}")
-            filename_ru_fem = f"ru_audio_female/ru_fem_{word_id}.mp3"
-            local_path_ru_fem = os.path.join("temp_audio", f"ru_fem_{word_id}.mp3")
-            try:
-                communicate = edge_tts.Communicate(word_ru, VOICE_RU_FEMALE)
-                await communicate.save(local_path_ru_fem)
-                with open(local_path_ru_fem, "rb") as f:
-                    supabase.storage.from_(BUCKET_NAME).upload(
-                        path=filename_ru_fem, file=f, file_options={"upsert": "true"}
-                    )
-                updates["audio_ru_female_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_ru_fem)
-            except Exception as e:
-                print(f"❌ Ошибка RU женский: {e}")
-                
-        if updates:
-            supabase.table("words_dictation").update(updates).eq("id", word_id).execute()
-            print(f"🔄 База Supabase обновлена для ID: {word_id}\n")
+            # 3. Русский (Женский) - если колонка существует
+            if word_ru:
+                try:
+                    if not audio_ru_female_url:
+                        print(f"🎙 Генерируем RU (женский) для: {word_ru}")
+                        filename_ru_fem = f"ru_audio_female/ru_fem_{word_id}.mp3"
+                        local_path_ru_fem = os.path.join("temp_audio", f"ru_fem_{word_id}.mp3")
+                        
+                        communicate = edge_tts.Communicate(word_ru, VOICE_RU_FEMALE)
+                        await communicate.save(local_path_ru_fem)
+                        with open(local_path_ru_fem, "rb") as f:
+                            supabase.storage.from_(BUCKET_NAME).upload(
+                                path=filename_ru_fem, file=f, file_options={"upsert": "true"}
+                            )
+                        updates["audio_ru_female_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_ru_fem)
+                except Exception as fem_err:
+                    print(f"⚠️ Пропущено женское аудио (возможно, нет колонки audio_ru_female_url): {fem_err}")
+                    
+            if updates:
+                supabase.table("words_dictation").update(updates).eq("id", word_id).execute()
+                print(f"🔄 База Supabase обновлена для ID: {word_id}\n")
+            
+            # Пауза между словами, чтобы сервер озвучки не блокировал запросы
+            await asyncio.sleep(1)
+            
+        except Exception as e:
+            print(f"❌ Ошибка при обработке слова {word_en}: {e}\n")
 
     print("🎉 Синхронизация завершена!")
 
