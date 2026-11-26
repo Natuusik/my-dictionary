@@ -17,7 +17,32 @@ let nextStepTimeout = null;
 
 const audioCache = new Map();
 let activeAudio = null;
+async function triggerInstantSync() {
+    const GITHUB_USERNAME = 'Natuusik';
+    const REPO_NAME = 'my-dictionary';
+    const TOKEN = 'ваш_токен_сюда'; // Тот самый токен, который вы создали в настройках GitHub
 
+    try {
+        const response = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/dispatches`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${TOKEN}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ event_type: 'trigger-sync' })
+        });
+
+        if (response.ok) {
+            alert("🚀 Сигнал отправлен! Озвучка сгенерируется через 10–15 секунд. Обновите страницу.");
+        } else {
+            alert("Ошибка при запуске синхронизации.");
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Не удалось связаться с GitHub API.");
+    }
+}
 // Инициализация подключения к Supabase
 async function initSupabase() {
     const statusBadge = document.getElementById('db-status');
