@@ -3,22 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Важно для работы онлайн-озвучки без блокировок -->
     <meta name="referrer" content="no-referrer">
-    <title>Аудио-тренажёр (EN ⇄ RU)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Cloud Аудио-тренажёр (Supabase)</title>
+    <script src="sb_publishable_buNcB1Gf3j4R0z68CwTSgQ__WHMuxFY"></script>
+    <!-- Подключаем официальный клиент Supabase -->
+    <script src="oxinddpmnblggssmcpbc"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
 
     <div class="w-full max-w-xl bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
         <!-- Шапка -->
-        <div class="bg-indigo-600 p-5 text-white flex justify-between items-center">
+        <div class="bg-emerald-700 p-5 text-white flex justify-between items-center">
             <div>
-                <h1 class="text-xl font-bold">Аудио-тренажёр (EN ⇄ RU)</h1>
-                <p class="text-indigo-200 text-xs">Вопрос ➔ Пауза ➔ Озвучка перевода</p>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-xl font-bold">Cloud Тренажёр (EN ⇄ RU)</h1>
+                    <span id="db-status" class="text-[10px] bg-emerald-900 text-emerald-200 px-2 py-0.5 rounded-full">Подключение...</span>
+                </div>
+                <p class="text-emerald-100 text-xs">Синхронизация с Supabase + HD озвучка</p>
             </div>
-            <button onclick="testAudio()" class="bg-indigo-500 hover:bg-indigo-400 text-xs px-3 py-2 rounded-xl font-semibold transition flex items-center gap-1 shadow-sm">
-                🔊 Тест звука
+            <button onclick="testAudio()" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-3 py-2 rounded-xl font-semibold transition flex items-center gap-1 shadow-sm border border-emerald-500">
+                🔊 Тест голоса
             </button>
         </div>
 
@@ -28,11 +32,11 @@
             <!-- Выбор и создание папки -->
             <div class="space-y-2">
                 <div class="flex justify-between items-center">
-                    <label class="text-sm font-semibold text-slate-700">Выберите папку:</label>
-                    <span id="total-words-badge" class="text-xs text-slate-500 font-medium">0 слов</span>
+                    <label class="text-sm font-semibold text-slate-700">Облачные папки:</label>
+                    <span id="total-words-badge" class="text-xs text-slate-500 font-medium">Загрузка...</span>
                 </div>
                 <div class="flex gap-2">
-                    <select id="folder-select" onchange="selectFolder()" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
+                    <select id="folder-select" onchange="selectFolder()" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none">
                     </select>
                     <button onclick="createNewFolder()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3.5 py-2 rounded-xl font-semibold transition" title="Создать папку">
                         + Папка
@@ -45,11 +49,13 @@
 
             <!-- Добавление слов -->
             <div class="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <label class="block text-sm font-semibold text-slate-700">Добавить слова в папку:</label>
+                <label class="block text-sm font-semibold text-slate-700">Добавить слова в облако:</label>
                 <p class="text-xs text-slate-500">Формат: <b>английское слово - русский перевод</b> (каждое с новой строки)</p>
-                <textarea id="bulk-input" rows="3" placeholder="apple - яблоко&#10;achieve - достигать&#10;confidence - уверенность" class="w-full p-3 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"></textarea>
-                <button onclick="addWords()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold py-2.5 rounded-xl transition">
-                    + Сохранить слова в папку
+                <textarea id="bulk-input" rows="3" placeholder="apple - яблоко
+achieve - достигать
+confidence - уверенность" class="w-full p-3 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-none"></textarea>
+                <button id="save-btn" onclick="addWords()" class="w-full bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold py-2.5 rounded-xl transition">
+                    ☁️ Сохранить в Supabase
                 </button>
             </div>
 
@@ -57,7 +63,7 @@
             <div>
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-semibold text-slate-700">Слова в этой папке:</span>
-                    <button onclick="clearFolderWords()" class="text-xs text-rose-500 hover:underline">Очистить список</button>
+                    <button onclick="clearFolderWords()" class="text-xs text-rose-500 hover:underline">Очистить папку</button>
                 </div>
                 <div id="words-list" class="max-h-36 overflow-y-auto space-y-1.5 pr-1">
                 </div>
@@ -68,7 +74,7 @@
             <!-- Направление перевода -->
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1">Направление диктовки:</label>
-                <select id="direction-select" class="w-full p-2.5 bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl text-sm font-bold outline-none">
+                <select id="direction-select" class="w-full p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-sm font-bold outline-none">
                     <option value="en-ru">🇬🇧 Английский ➔ 🇷🇺 Русский (сначала EN, через паузу RU)</option>
                     <option value="ru-en">🇷🇺 Русский ➔ 🇬🇧 Английский (сначала RU, через паузу EN)</option>
                 </select>
@@ -94,17 +100,17 @@
 
             <div class="flex items-center justify-between text-sm text-slate-600 px-1">
                 <label class="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" id="shuffle-check" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <input type="checkbox" id="shuffle-check" class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
                     <span>Перемешать слова</span>
                 </label>
                 <label class="flex items-center space-x-2 cursor-pointer">
-                    <input type="checkbox" id="hide-answer-check" checked class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <input type="checkbox" id="hide-answer-check" checked class="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4">
                     <span>Скрывать ответ до озвучки</span>
                 </label>
             </div>
 
             <!-- Кнопка запуска -->
-            <button onclick="startTraining()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-indigo-200 transition text-base">
+            <button onclick="startTraining()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-emerald-200 transition text-base">
                 ▶ Начать тренировку
             </button>
         </div>
@@ -113,22 +119,20 @@
         <div id="training-screen" class="p-6 space-y-6 hidden text-center">
             <div class="flex justify-between items-center text-xs font-semibold text-slate-400 uppercase tracking-wider">
                 <span id="active-folder-title">Папка №1</span>
-                <span id="direction-badge" class="text-indigo-600">EN ➔ RU</span>
+                <span id="direction-badge" class="text-emerald-600">EN ➔ RU</span>
                 <span id="progress-counter">1 / 10</span>
             </div>
 
             <!-- Карточка текущего слова -->
-            <div class="bg-indigo-50 border border-indigo-100 rounded-3xl p-8 space-y-4 min-h-[230px] flex flex-col justify-center items-center relative">
-                <div id="status-badge" class="text-xs font-semibold px-3 py-1 rounded-full bg-indigo-200 text-indigo-800">
-                    Слушайте вопрос...
+            <div class="bg-emerald-50/70 border border-emerald-100 rounded-3xl p-8 space-y-4 min-h-[230px] flex flex-col justify-center items-center relative">
+                <div id="status-badge" class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-200 text-emerald-900">
+                    Слушайте слово...
                 </div>
                 
-                <!-- Слово-вопрос -->
                 <div id="prompt-word" class="text-3xl font-extrabold text-slate-800 tracking-wide">
                     ...
                 </div>
                 
-                <!-- Слово-ответ -->
                 <div id="answer-word" class="text-xl font-bold text-emerald-600 transition-all duration-300 min-h-[28px]">
                     ...
                 </div>
@@ -137,10 +141,10 @@
                 <div class="w-full max-w-xs pt-2">
                     <div class="flex justify-between text-xs text-slate-500 mb-1">
                         <span id="timer-label">Ответ через:</span>
-                        <span id="timer-seconds" class="font-bold text-indigo-600">5 с</span>
+                        <span id="timer-seconds" class="font-bold text-emerald-700">5 с</span>
                     </div>
                     <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                        <div id="timer-bar" class="bg-indigo-600 h-2 rounded-full transition-all duration-100" style="width: 100%"></div>
+                        <div id="timer-bar" class="bg-emerald-600 h-2 rounded-full transition-all duration-100" style="width: 100%"></div>
                     </div>
                 </div>
             </div>
@@ -163,40 +167,86 @@
     </div>
 
     <script>
-        let data = JSON.parse(localStorage.getItem('dictation_folders_v3')) || {
-            "Папка №1": [
-                { en: "apple", ru: "яблоко" },
-                { en: "journey", ru: "путешествие" },
-                { en: "knowledge", ru: "знание" }
-            ],
-            "Папка №2": [
-                { en: "developer", ru: "разработчик" },
-                { en: "success", ru: "успех" }
-            ]
-        };
+        // =====================================================================
+        // ВСТАВЬТЕ ВАШИ ДАННЫЕ ИЗ SUPABASE (Project Settings -> API)
+        // =====================================================================
+        const SUPABASE_URL = 'https://ВАШ_ПРОЕКТ.supabase.co';
+        const SUPABASE_KEY = 'ВАШ_ANON_PUBLIC_KEY';
+        // =====================================================================
 
-        let currentFolder = Object.keys(data)[0] || "Папка №1";
+        let supabaseClient = null;
+        let foldersMap = { "Папка №1": [] };
+        let currentFolder = "Папка №1";
+        
         let trainingQueue = [];
         let currentIndex = 0;
         let isTraining = false;
         let countdownInterval = null;
         let nextStepTimeout = null;
-        let currentAudioObj = null;
+        
+        const audioCache = new Map();
+        let activeAudio = null;
 
-        // Предзагрузка голосов браузера (в некоторых браузерах они загружаются асинхронно)
-        let availableVoices = [];
-        function loadVoices() {
-            if ('speechSynthesis' in window) {
-                availableVoices = window.speechSynthesis.getVoices();
+        // Инициализация подключения к Supabase
+        async function initSupabase() {
+            const statusBadge = document.getElementById('db-status');
+            if (SUPABASE_URL.includes('ВАШ_ПРОЕКТ')) {
+                statusBadge.textContent = "Нет ключей API";
+                statusBadge.className = "text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full";
+                renderUI();
+                return;
+            }
+
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                await loadFromDatabase();
+                statusBadge.textContent = "Онлайн (БД)";
+                statusBadge.className = "text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full";
+            } catch (err) {
+                console.error("Ошибка Supabase:", err);
+                statusBadge.textContent = "Ошибка БД";
+                statusBadge.className = "text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full";
             }
         }
-        loadVoices();
-        if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
-            window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
 
-        function saveData() {
-            localStorage.setItem('dictation_folders_v3', JSON.stringify(data));
+        // Загрузка всех слов и папок из таблицы Supabase
+        async function loadFromDatabase() {
+            if (!supabaseClient) return;
+
+            const { data, error } = await supabaseClient
+                .from('words_dictation')
+                .select('*')
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                alert("Ошибка загрузки из Supabase: " + error.message);
+                return;
+            }
+
+            // Группируем записи по папкам
+            const grouped = {};
+            if (data && data.length > 0) {
+                data.forEach(row => {
+                    if (!grouped[row.folder_name]) {
+                        grouped[row.folder_name] = [];
+                    }
+                    grouped[row.folder_name].push({
+                        id: row.id,
+                        en: row.word_en,
+                        ru: row.word_ru || '',
+                        audioEnUrl: row.audio_en_url, // Поддержка студийных MP3 из базы
+                        audioRuUrl: row.audio_ru_url
+                    });
+                });
+                foldersMap = grouped;
+                if (!foldersMap[currentFolder]) {
+                    currentFolder = Object.keys(foldersMap)[0];
+                }
+            } else {
+                foldersMap = { "Папка №1": [] };
+                currentFolder = "Папка №1";
+            }
+
             renderUI();
         }
 
@@ -204,39 +254,36 @@
             const select = document.getElementById('folder-select');
             select.innerHTML = '';
             
-            const folderNames = Object.keys(data);
-            if (!folderNames.includes(currentFolder) && folderNames.length > 0) {
-                currentFolder = folderNames[0];
-            }
-
+            const folderNames = Object.keys(foldersMap);
             folderNames.forEach(name => {
                 const option = document.createElement('option');
                 option.value = name;
-                option.textContent = `${name} (${data[name].length})`;
+                option.textContent = `${name} (${foldersMap[name].length})`;
                 if (name === currentFolder) option.selected = true;
                 select.appendChild(option);
             });
 
             const listContainer = document.getElementById('words-list');
             listContainer.innerHTML = '';
-            const words = data[currentFolder] || [];
+            const words = foldersMap[currentFolder] || [];
             
             document.getElementById('total-words-badge').textContent = `${words.length} слов`;
 
             if (words.length === 0) {
-                listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">В этой папке пока нет слов</p>';
+                listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Папка пуста. Добавьте слова выше.</p>';
                 return;
             }
 
-            words.forEach((item, index) => {
+            words.forEach((item) => {
                 const div = document.createElement('div');
                 div.className = 'flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 text-sm';
                 div.innerHTML = `
                     <div>
                         <span class="font-bold text-slate-800">${item.en}</span>
                         <span class="text-slate-500"> — ${item.ru || '<i class="text-rose-400 text-xs">нет перевода</i>'}</span>
+                        ${item.audioEnUrl ? '<span class="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">HD MP3</span>' : ''}
                     </div>
-                    <button onclick="deleteWord(${index})" class="text-slate-400 hover:text-rose-500 px-2 font-bold">✕</button>
+                    <button onclick="deleteWord('${item.id}')" class="text-slate-400 hover:text-rose-500 px-2 font-bold">✕</button>
                 `;
                 listContainer.appendChild(div);
             });
@@ -248,64 +295,139 @@
         }
 
         function createNewFolder() {
-            const nextNum = Object.keys(data).length + 1;
-            const name = prompt("Введите название папки:", `Папка №${nextNum}`);
+            const nextNum = Object.keys(foldersMap).length + 1;
+            const name = prompt("Введите название новой папки:", `Папка №${nextNum}`);
             if (name && name.trim()) {
                 const cleanName = name.trim();
-                if (!data[cleanName]) {
-                    data[cleanName] = [];
+                if (!foldersMap[cleanName]) {
+                    foldersMap[cleanName] = [];
                 }
                 currentFolder = cleanName;
-                saveData();
+                renderUI();
             }
         }
 
-        function deleteCurrentFolder() {
-            const keys = Object.keys(data);
-            if (keys.length <= 1) {
-                alert("Нельзя удалить последнюю папку!");
-                return;
+        async function deleteCurrentFolder() {
+            if (!confirm(`Удалить папку "${currentFolder}" и все её слова из облака?`)) return;
+
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('words_dictation')
+                    .delete()
+                    .eq('folder_name', currentFolder);
             }
-            if (confirm(`Удалить "${currentFolder}" и все слова в ней?`)) {
-                delete data[currentFolder];
-                currentFolder = Object.keys(data)[0];
-                saveData();
+
+            delete foldersMap[currentFolder];
+            if (Object.keys(foldersMap).length === 0) {
+                foldersMap["Папка №1"] = [];
             }
+            currentFolder = Object.keys(foldersMap)[0];
+            renderUI();
         }
 
-        function addWords() {
+        async function addWords() {
             const raw = document.getElementById('bulk-input').value.trim();
             if (!raw) return;
 
+            const btn = document.getElementById('save-btn');
+            btn.textContent = "⏳ Сохранение в облако...";
+            btn.disabled = true;
+
             const lines = raw.split('\n');
+            const rowsToInsert = [];
+
             lines.forEach(line => {
                 if (!line.trim()) return;
                 const parts = line.split(/[-—]/);
                 const en = parts[0].trim();
                 const ru = parts.slice(1).join('-').trim();
                 if (en) {
-                    data[currentFolder].push({ en, ru });
+                    rowsToInsert.push({
+                        folder_name: currentFolder,
+                        word_en: en,
+                        word_ru: ru
+                    });
                 }
             });
 
+            if (rowsToInsert.length > 0) {
+                if (supabaseClient) {
+                    const { error } = await supabaseClient
+                        .from('words_dictation')
+                        .insert(rowsToInsert);
+                    
+                    if (error) {
+                        alert("Ошибка сохранения: " + error.message);
+                    } else {
+                        await loadFromDatabase();
+                    }
+                } else {
+                    // Локальный режим, если ключи ещё не вставлены
+                    rowsToInsert.forEach(r => {
+                        foldersMap[currentFolder].push({ id: Date.now() + Math.random(), en: r.word_en, ru: r.word_ru });
+                    });
+                    renderUI();
+                }
+            }
+
             document.getElementById('bulk-input').value = '';
-            saveData();
+            btn.textContent = "☁️ Сохранить в Supabase";
+            btn.disabled = false;
         }
 
-        function deleteWord(index) {
-            data[currentFolder].splice(index, 1);
-            saveData();
-        }
-
-        function clearFolderWords() {
-            if (confirm("Очистить все слова в текущей папке?")) {
-                data[currentFolder] = [];
-                saveData();
+        async function deleteWord(id) {
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('words_dictation')
+                    .delete()
+                    .eq('id', id);
+                await loadFromDatabase();
+            } else {
+                foldersMap[currentFolder] = foldersMap[currentFolder].filter(w => String(w.id) !== String(id));
+                renderUI();
             }
         }
 
-        // --- УМНАЯ ГИБРИДНАЯ ОЗВУЧКА (БРАУЗЕР + ОНЛАЙН РЕЗЕРВ) ---
-        function speakText(text, langCode, onFinishedCallback) {
+        async function clearFolderWords() {
+            if (!confirm("Очистить все слова в этой папке?")) return;
+            await deleteCurrentFolder();
+        }
+
+        // --- ОЗВУЧКА: ПОДДЕРЖКА MP3 ИЗ SUPABASE + ПРЕДЗАГРУЗКА HD ---
+        function getAudioUrl(text, langCode, customUrl) {
+            // Если в базе Supabase для слова прикреплена студийная запись носителя — используем её!
+            if (customUrl) return customUrl;
+            return `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${langCode}&q=${encodeURIComponent(text)}`;
+        }
+
+        function preloadAudio(text, langCode, customUrl = null) {
+            if (!text || text === '—') return;
+            const key = customUrl || `${langCode}:${text.toLowerCase()}`;
+            if (!audioCache.has(key)) {
+                const audio = new Audio();
+                audio.referrerPolicy = "no-referrer";
+                audio.src = getAudioUrl(text, langCode, customUrl);
+                audio.preload = "auto";
+                audioCache.set(key, audio);
+            }
+        }
+
+        function speakSystemFallback(text, langCode, doneCallback) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = langCode === 'ru' ? 'ru-RU' : 'en-US';
+                utterance.rate = 0.9;
+                utterance.onend = doneCallback;
+                utterance.onerror = doneCallback;
+                window.speechSynthesis.speak(utterance);
+                setTimeout(doneCallback, 3500);
+            } else {
+                doneCallback();
+            }
+        }
+
+        function speakText(text, langCode, customUrl, onFinishedCallback) {
             if (!text || text === '—') {
                 if (onFinishedCallback) onFinishedCallback();
                 return;
@@ -319,70 +441,57 @@
                 }
             };
 
-            // Обновляем список голосов
-            if ('speechSynthesis' in window) {
-                availableVoices = window.speechSynthesis.getVoices();
-            }
+            const key = customUrl || `${langCode}:${text.toLowerCase()}`;
+            let audio = audioCache.get(key);
 
-            // Ищем системный голос для нужного языка ('en' или 'ru')
-            const targetPrefix = langCode === 'ru' ? 'ru' : 'en';
-            const matchingVoice = availableVoices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
-
-            // Если в системе есть голос для этого языка — используем его (он работает мгновенно и без интернета)
-            if ('speechSynthesis' in window && matchingVoice) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.voice = matchingVoice;
-                utterance.lang = matchingVoice.lang;
-                utterance.rate = 0.9;
-
-                utterance.onend = done;
-                utterance.onerror = () => playOnlineAudio(text, langCode, done);
-
-                window.speechSynthesis.speak(utterance);
-                // Страховка на случай зависания синтезатора
-                setTimeout(done, 4500);
+            if (!audio) {
+                audio = new Audio();
+                audio.referrerPolicy = "no-referrer";
+                audio.src = getAudioUrl(text, langCode, customUrl);
+                audioCache.set(key, audio);
             } else {
-                // Если системного голоса нет (например, для русского) — используем онлайн-поток
-                playOnlineAudio(text, langCode, done);
+                audio.currentTime = 0;
             }
-        }
 
-        function playOnlineAudio(text, langCode, doneCallback) {
-            if (currentAudioObj) {
-                currentAudioObj.pause();
-            }
-            
-            // Создаём свежий объект Audio без отправки Referer
-            const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${langCode}&q=${encodeURIComponent(text)}`;
-            currentAudioObj = new Audio(url);
-            currentAudioObj.referrerPolicy = "no-referrer";
-            
-            currentAudioObj.onended = doneCallback;
-            currentAudioObj.onerror = () => {
-                // Запасной вариант №2 (другой эндпоинт Google)
-                const backupUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langCode}&client=tw-ob`;
-                const backupAudio = new Audio(backupUrl);
-                backupAudio.onended = doneCallback;
-                backupAudio.onerror = doneCallback;
-                backupAudio.play().catch(doneCallback);
+            activeAudio = audio;
+
+            const networkTimeout = setTimeout(() => {
+                if (!finished && audio.paused) {
+                    audio.pause();
+                    audioCache.delete(key);
+                    speakSystemFallback(text, langCode, done);
+                }
+            }, 2200);
+
+            audio.onplaying = () => clearTimeout(networkTimeout);
+            audio.onended = () => {
+                clearTimeout(networkTimeout);
+                done();
+            };
+            audio.onerror = () => {
+                clearTimeout(networkTimeout);
+                audioCache.delete(key);
+                speakSystemFallback(text, langCode, done);
             };
 
-            currentAudioObj.play().catch(doneCallback);
-            setTimeout(doneCallback, 4500);
+            audio.play().catch(() => {
+                clearTimeout(networkTimeout);
+                speakSystemFallback(text, langCode, done);
+            });
         }
 
         function testAudio() {
-            speakText("Hello", "en", () => {
+            preloadAudio("Облачный тренажёр готов к работе", "ru");
+            speakText("Cloud trainer is ready", "en", null, () => {
                 setTimeout(() => {
-                    speakText("Привет, звук работает", "ru");
-                }, 400);
+                    speakText("Облачный тренажёр готов к работе", "ru", null);
+                }, 300);
             });
         }
 
         // --- ЛОГИКА ТРЕНИРОВКИ ---
         function startTraining() {
-            const words = data[currentFolder] || [];
+            const words = foldersMap[currentFolder] || [];
             if (words.length === 0) {
                 alert("Добавьте хотя бы одно слово в папку перед началом!");
                 return;
@@ -431,13 +540,18 @@
 
             const promptText = direction === 'en-ru' ? item.en : (item.ru || item.en);
             const promptLang = direction === 'en-ru' ? 'en' : 'ru';
+            const promptUrl = direction === 'en-ru' ? item.audioEnUrl : item.audioRuUrl;
             
             const answerText = direction === 'en-ru' ? (item.ru || '—') : item.en;
             const answerLang = direction === 'en-ru' ? 'ru' : 'en';
+            const answerUrl = direction === 'en-ru' ? item.audioRuUrl : item.audioEnUrl;
+
+            // Предзагрузка ответа во время паузы
+            setTimeout(() => preloadAudio(answerText, answerLang, answerUrl), 400);
 
             document.getElementById('progress-counter').textContent = `${currentIndex + 1} / ${trainingQueue.length}`;
             document.getElementById('status-badge').textContent = "1. Слушайте слово...";
-            document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-indigo-200 text-indigo-800";
+            document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-emerald-200 text-emerald-900";
             
             document.getElementById('prompt-word').textContent = promptText;
             
@@ -453,13 +567,13 @@
             document.getElementById('timer-seconds').textContent = `${delaySec} с`;
             document.getElementById('timer-bar').style.width = '100%';
 
-            speakText(promptText, promptLang, () => {
+            speakText(promptText, promptLang, promptUrl, () => {
                 if (!isTraining) return;
-                startThinkTimer(delaySec, answerText, answerLang);
+                startThinkTimer(delaySec, answerText, answerLang, answerUrl);
             });
         }
 
-        function startThinkTimer(seconds, answerText, answerLang) {
+        function startThinkTimer(seconds, answerText, answerLang, answerUrl) {
             document.getElementById('status-badge').textContent = "2. Вспомните перевод...";
             document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-amber-200 text-amber-800";
 
@@ -476,12 +590,12 @@
 
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
-                    revealAndSpeakAnswer(answerText, answerLang);
+                    revealAndSpeakAnswer(answerText, answerLang, answerUrl);
                 }
             }, 100);
         }
 
-        function revealAndSpeakAnswer(answerText, answerLang) {
+        function revealAndSpeakAnswer(answerText, answerLang, answerUrl) {
             if (!isTraining) return;
 
             document.getElementById('status-badge').textContent = "3. Правильный перевод:";
@@ -492,7 +606,7 @@
             const answerEl = document.getElementById('answer-word');
             answerEl.classList.remove('blur-sm', 'select-none', 'opacity-40');
 
-            speakText(answerText, answerLang, () => {
+            speakText(answerText, answerLang, answerUrl, () => {
                 if (!isTraining) return;
                 nextStepTimeout = setTimeout(() => {
                     currentIndex++;
@@ -516,8 +630,8 @@
         function clearTimers() {
             if (countdownInterval) clearInterval(countdownInterval);
             if (nextStepTimeout) clearTimeout(nextStepTimeout);
+            if (activeAudio) activeAudio.pause();
             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-            if (currentAudioObj) currentAudioObj.pause();
         }
 
         function stopTraining() {
@@ -527,7 +641,8 @@
             document.getElementById('setup-screen').classList.remove('hidden');
         }
 
-        renderUI();
+        // Запуск инициализации при открытии страницы
+        initSupabase();
     </script>
 </body>
 </html>
