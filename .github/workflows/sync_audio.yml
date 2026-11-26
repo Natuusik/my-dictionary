@@ -1,9 +1,9 @@
 name: Auto Sync Audio
 
 on:
-  schedule:
-    - cron: '*/10 * * * *'
-  workflow_dispatch:
+  workflow_dispatch:      # Кнопка ручного запуска во вкладке Actions
+  repository_dispatch:    # Сигнал от вашей кнопки на сайте
+    types: [trigger-sync]
 
 jobs:
   run-script:
