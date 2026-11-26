@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Важно для работы онлайн-озвучки без блокировок -->
+    <meta name="referrer" content="no-referrer">
     <title>Аудио-тренажёр (EN ⇄ RU)</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
@@ -15,7 +17,9 @@
                 <h1 class="text-xl font-bold">Аудио-тренажёр (EN ⇄ RU)</h1>
                 <p class="text-indigo-200 text-xs">Вопрос ➔ Пауза ➔ Озвучка перевода</p>
             </div>
-            <span id="total-words-badge" class="bg-indigo-500 text-xs px-3 py-1 rounded-full font-medium">0 слов</span>
+            <button onclick="testAudio()" class="bg-indigo-500 hover:bg-indigo-400 text-xs px-3 py-2 rounded-xl font-semibold transition flex items-center gap-1 shadow-sm">
+                🔊 Тест звука
+            </button>
         </div>
 
         <!-- ЭКРАН 1: ПАПКИ И НАСТРОЙКИ -->
@@ -23,7 +27,10 @@
             
             <!-- Выбор и создание папки -->
             <div class="space-y-2">
-                <label class="block text-sm font-semibold text-slate-700">Выберите папку:</label>
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700">Выберите папку:</label>
+                    <span id="total-words-badge" class="text-xs text-slate-500 font-medium">0 слов</span>
+                </div>
                 <div class="flex gap-2">
                     <select id="folder-select" onchange="selectFolder()" class="flex-1 p-2.5 bg-slate-50 border border-slate-300 rounded-xl font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none">
                     </select>
@@ -155,10 +162,6 @@
 
     </div>
 
-    <!-- Аудиоплееры для гарантированной озвучки -->
-    <audio id="audio-en"></audio>
-    <audio id="audio-ru"></audio>
-
     <script>
         let data = JSON.parse(localStorage.getItem('dictation_folders_v3')) || {
             "Папка №1": [
@@ -178,6 +181,19 @@
         let isTraining = false;
         let countdownInterval = null;
         let nextStepTimeout = null;
+        let currentAudioObj = null;
+
+        // Предзагрузка голосов браузера (в некоторых браузерах они загружаются асинхронно)
+        let availableVoices = [];
+        function loadVoices() {
+            if ('speechSynthesis' in window) {
+                availableVoices = window.speechSynthesis.getVoices();
+            }
+        }
+        loadVoices();
+        if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
 
         function saveData() {
             localStorage.setItem('dictation_folders_v3', JSON.stringify(data));
@@ -288,19 +304,13 @@
             }
         }
 
-        // --- ГАРАНТИРОВАННАЯ ОЗВУЧКА GOOGLE AUDIO ДЛЯ EN И RU ---
+        // --- УМНАЯ ГИБРИДНАЯ ОЗВУЧКА (БРАУЗЕР + ОНЛАЙН РЕЗЕРВ) ---
         function speakText(text, langCode, onFinishedCallback) {
-            if (!text) {
+            if (!text || text === '—') {
                 if (onFinishedCallback) onFinishedCallback();
                 return;
             }
 
-            // Используем официальный онлайн-поток Google Translate отдельно для каждого языка ('en' или 'ru')
-            const audioId = langCode === 'ru' ? 'audio-ru' : 'audio-en';
-            const audio = document.getElementById(audioId);
-            
-            audio.src = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langCode}&client=tw-ob`;
-            
             let finished = false;
             const done = () => {
                 if (!finished) {
@@ -309,16 +319,65 @@
                 }
             };
 
-            audio.onended = done;
-            audio.onerror = done;
+            // Обновляем список голосов
+            if ('speechSynthesis' in window) {
+                availableVoices = window.speechSynthesis.getVoices();
+            }
 
-            audio.play().catch(err => {
-                console.warn("Ошибка воспроизведения аудио:", err);
-                done();
+            // Ищем системный голос для нужного языка ('en' или 'ru')
+            const targetPrefix = langCode === 'ru' ? 'ru' : 'en';
+            const matchingVoice = availableVoices.find(v => v.lang.toLowerCase().startsWith(targetPrefix));
+
+            // Если в системе есть голос для этого языка — используем его (он работает мгновенно и без интернета)
+            if ('speechSynthesis' in window && matchingVoice) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.voice = matchingVoice;
+                utterance.lang = matchingVoice.lang;
+                utterance.rate = 0.9;
+
+                utterance.onend = done;
+                utterance.onerror = () => playOnlineAudio(text, langCode, done);
+
+                window.speechSynthesis.speak(utterance);
+                // Страховка на случай зависания синтезатора
+                setTimeout(done, 4500);
+            } else {
+                // Если системного голоса нет (например, для русского) — используем онлайн-поток
+                playOnlineAudio(text, langCode, done);
+            }
+        }
+
+        function playOnlineAudio(text, langCode, doneCallback) {
+            if (currentAudioObj) {
+                currentAudioObj.pause();
+            }
+            
+            // Создаём свежий объект Audio без отправки Referer
+            const url = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${langCode}&q=${encodeURIComponent(text)}`;
+            currentAudioObj = new Audio(url);
+            currentAudioObj.referrerPolicy = "no-referrer";
+            
+            currentAudioObj.onended = doneCallback;
+            currentAudioObj.onerror = () => {
+                // Запасной вариант №2 (другой эндпоинт Google)
+                const backupUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langCode}&client=tw-ob`;
+                const backupAudio = new Audio(backupUrl);
+                backupAudio.onended = doneCallback;
+                backupAudio.onerror = doneCallback;
+                backupAudio.play().catch(doneCallback);
+            };
+
+            currentAudioObj.play().catch(doneCallback);
+            setTimeout(doneCallback, 4500);
+        }
+
+        function testAudio() {
+            speakText("Hello", "en", () => {
+                setTimeout(() => {
+                    speakText("Привет, звук работает", "ru");
+                }, 400);
             });
-
-            // Страховка на случай задержки сети
-            setTimeout(done, 4000);
         }
 
         // --- ЛОГИКА ТРЕНИРОВКИ ---
@@ -393,12 +452,9 @@
             document.getElementById('timer-label').textContent = "Перевод прозвучит через:";
             document.getElementById('timer-seconds').textContent = `${delaySec} с`;
             document.getElementById('timer-bar').style.width = '100%';
-            document.getElementById('timer-bar').className = "bg-indigo-600 h-2 rounded-full transition-all duration-100";
 
-            // Шаг 1: Озвучиваем вопрос
             speakText(promptText, promptLang, () => {
                 if (!isTraining) return;
-                // Шаг 2: Таймер на раздумье
                 startThinkTimer(delaySec, answerText, answerLang);
             });
         }
@@ -420,7 +476,6 @@
 
                 if (remaining <= 0) {
                     clearInterval(countdownInterval);
-                    // Шаг 3: Показываем и озвучиваем перевод (включая русский)
                     revealAndSpeakAnswer(answerText, answerLang);
                 }
             }, 100);
@@ -461,8 +516,8 @@
         function clearTimers() {
             if (countdownInterval) clearInterval(countdownInterval);
             if (nextStepTimeout) clearTimeout(nextStepTimeout);
-            document.getElementById('audio-en').pause();
-            document.getElementById('audio-ru').pause();
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            if (currentAudioObj) currentAudioObj.pause();
         }
 
         function stopTraining() {
