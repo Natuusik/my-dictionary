@@ -17,6 +17,8 @@ let nextStepTimeout = null;
 
 const audioCache = new Map();
 let activeAudio = null;
+
+// --- СИНХРОНИЗАЦИЯ С GITHUB ---
 async function triggerInstantSync() {
     const GITHUB_USERNAME = 'Natuusik';
     const REPO_NAME = 'my-dictionary';
@@ -44,22 +46,22 @@ async function triggerInstantSync() {
     }
 }
 
-// Функция быстрой вставки из буфера обмена
+// --- БУФЕР ОБМЕНА И ПЕРЕВОД ---
 async function pasteFromClipboard(elementId) {
     try {
         const text = await navigator.clipboard.readText();
-        document.getElementById(elementId).value = text;
+        const el = document.getElementById(elementId);
+        if (el) el.value = text;
     } catch (err) {
         console.error("Не удалось прочитать буфер обмена:", err);
         alert("Разрешите доступ к буферу обмена в браузере.");
     }
 }
 
-// Функция автоматического перевода через бесплатный публичный API
 async function translateWord() {
     const textInput = document.getElementById('sourceWord');
     const targetInput = document.getElementById('targetWord');
-    const text = textInput.value.trim();
+    const text = textInput ? textInput.value.trim() : '';
 
     if (!text) {
         alert("Сначала введите английское слово или фразу для перевода!");
@@ -67,52 +69,31 @@ async function translateWord() {
     }
 
     try {
-        targetInput.placeholder = "Переводим...";
-        // Используем бесплатный API MyMemory для перевода с английского на русский
+        if (targetInput) targetInput.placeholder = "Переводим...";
+        
         const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`);
         const data = await response.json();
         
         if (data && data.responseData && data.responseData.translatedText) {
-            targetInput.value = data.responseData.translatedText;
+            if (targetInput) targetInput.value = data.responseData.translatedText;
         } else {
-            targetInput.placeholder = "Не удалось перевести";
+            if (targetInput) targetInput.placeholder = "Не удалось перевести";
         }
     } catch (err) {
         console.error("Ошибка перевода:", err);
         alert("Ошибка соединения с сервисом перевода.");
-        targetInput.placeholder = "Перевод...";
+        if (targetInput) targetInput.placeholder = "Перевод...";
     }
 }
 
-// Функция сохранения одиночного слова (связывает новые поля с вашей базой Supabase)
-async function addNewSingleWord() {
-    const englishWord = document.getElementById('sourceWord').value.trim();
-    const russianWord = document.getElementById('targetWord').value.trim();
-
-    if (!englishWord || !russianWord) {
-        alert("Пожалуйста, заполните оба поля: и слово, и перевод!");
-        return;
-    }
-
-    // Здесь вызывается ваша логика добавления в Supabase (куда у вас уходит сохранение слов)
-    // Например, передаем их в вашу существующую функцию добавления:
-    if (typeof saveWordToSupabase === 'function') {
-        await saveWordToSupabase(englishWord, russianWord);
-        document.getElementById('sourceWord').value = '';
-        document.getElementById('targetWord').value = '';
-    } else {
-        console.log("Добавлено:", englishWord, "-", russianWord);
-        // Временное уведомление, если функция сохранения в script.js называется иначе
-        alert(`Слово "${englishWord} - ${russianWord}" готово к сохранению!`);
-    }
-}
-
-// Инициализация подключения к Supabase
+// --- ИНИЦИАЛИЗАЦИЯ И РАБОТА С SUPABASE ---
 async function initSupabase() {
     const statusBadge = document.getElementById('db-status');
     if (SUPABASE_URL.includes('ВАШ_ПРОЕКТ')) {
-        statusBadge.textContent = "Нет ключей API";
-        statusBadge.className = "text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full";
+        if (statusBadge) {
+            statusBadge.textContent = "Нет ключей API";
+            statusBadge.className = "text-[10px] bg-amber-500 text-white px-2 py-0.5 rounded-full";
+        }
         renderUI();
         return;
     }
@@ -120,40 +101,23 @@ async function initSupabase() {
     try {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         await loadFromDatabase();
-        statusBadge.textContent = "Онлайн (БД)";
-        statusBadge.className = "text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full";
+        
+        // Восстанавливаем настройки пользователя из localStorage после загрузки базы
+        loadUserSettings();
+
+        if (statusBadge) {
+            statusBadge.textContent = "Онлайн (БД)";
+            statusBadge.className = "text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full";
+        }
     } catch (err) {
         console.error("Ошибка Supabase:", err);
-        statusBadge.textContent = "Ошибка БД";
-        statusBadge.className = "text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full";
+        if (statusBadge) {
+            statusBadge.textContent = "Ошибка БД";
+            statusBadge.className = "text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full";
+        }
     }
 }
 
-// Функция для получения выбранного голоса
-function getCurrentVoiceType() {
-    const select = document.getElementById('voiceSelect');
-    return select ? select.value : 'pro'; // по умолчанию 'pro' (мужской)
-}
-
-// Функция воспроизведения аудио слова с учетом выбранного голоса
-function playWordAudio(wordItem) {
-    const voiceType = getCurrentVoiceType(); // 'pro' или 'female'
-    
-    let audioUrl = '';
-    
-    if (voiceType === 'female') {
-        audioUrl = wordItem.audioRuFemaleUrl; // Женская версия
-    } else {
-        audioUrl = wordItem.audioRuUrl; // Мужская версия (основная)
-    }
-    
-    if (audioUrl) {
-        const audio = new Audio(audioUrl);
-        audio.play().catch(e => console.log("Ошибка воспроизведения:", e));
-    }
-}
-
-// Загрузка всех слов и папок из таблицы Supabase
 async function loadFromDatabase() {
     if (!supabaseClient) return;
 
@@ -179,11 +143,16 @@ async function loadFromDatabase() {
                 ru: row.word_ru || '',
                 audioEnUrl: row.audio_en_url,
                 audioRuUrl: row.audio_ru_url,
-                audioRuFemaleUrl: row.audio_ru_female_url // Поддержка женской озвучки
+                audioRuFemaleUrl: row.audio_ru_female_url
             });
         });
         foldersMap = grouped;
-        if (!foldersMap[currentFolder]) {
+        
+        // Если сохраненная папка существует в базе, оставляем её, иначе берем первую
+        const savedFolder = localStorage.getItem('user_folder');
+        if (savedFolder && foldersMap[savedFolder]) {
+            currentFolder = savedFolder;
+        } else if (!foldersMap[currentFolder]) {
             currentFolder = Object.keys(foldersMap)[0];
         }
     } else {
@@ -196,6 +165,8 @@ async function loadFromDatabase() {
 
 function renderUI() {
     const select = document.getElementById('folder-select');
+    if (!select) return;
+    
     select.innerHTML = '';
     
     const folderNames = Object.keys(foldersMap);
@@ -208,10 +179,13 @@ function renderUI() {
     });
 
     const listContainer = document.getElementById('words-list');
+    if (!listContainer) return;
+    
     listContainer.innerHTML = '';
     const words = foldersMap[currentFolder] || [];
     
-    document.getElementById('total-words-badge').textContent = `${words.length} слов`;
+    const badge = document.getElementById('total-words-badge');
+    if (badge) badge.textContent = `${words.length} слов`;
 
     if (words.length === 0) {
         listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Папка пуста. Добавьте слова выше.</p>';
@@ -234,8 +208,12 @@ function renderUI() {
 }
 
 function selectFolder() {
-    currentFolder = document.getElementById('folder-select').value;
-    renderUI();
+    const select = document.getElementById('folder-select');
+    if (select) {
+        currentFolder = select.value;
+        saveUserSettings();
+        renderUI();
+    }
 }
 
 function createNewFolder() {
@@ -247,6 +225,7 @@ function createNewFolder() {
             foldersMap[cleanName] = [];
         }
         currentFolder = cleanName;
+        saveUserSettings();
         renderUI();
     }
 }
@@ -266,16 +245,56 @@ async function deleteCurrentFolder() {
         foldersMap["Папка №1"] = [];
     }
     currentFolder = Object.keys(foldersMap)[0];
+    saveUserSettings();
     renderUI();
 }
 
+// Сохранение одиночного слова из новой формы
+async function addNewSingleWord() {
+    const englishWord = document.getElementById('sourceWord').value.trim();
+    const russianWord = document.getElementById('targetWord').value.trim();
+
+    if (!englishWord || !russianWord) {
+        alert("Пожалуйста, заполните оба поля: и слово, и перевод!");
+        return;
+    }
+
+    const rowsToInsert = [{
+        folder_name: currentFolder,
+        word_en: englishWord,
+        word_ru: russianWord
+    }];
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient
+            .from('words_dictation')
+            .insert(rowsToInsert);
+        
+        if (error) {
+            alert("Ошибка сохранения: " + error.message);
+        } else {
+            await loadFromDatabase();
+            document.getElementById('sourceWord').value = '';
+            document.getElementById('targetWord').value = '';
+        }
+    } else {
+        foldersMap[currentFolder].push({ id: Date.now() + Math.random(), en: englishWord, ru: russianWord });
+        document.getElementById('sourceWord').value = '';
+        document.getElementById('targetWord').value = '';
+        renderUI();
+    }
+}
+
+// Сохранение пакета слов (если используется старое поле bulk-input)
 async function addWords() {
     const raw = document.getElementById('bulk-input').value.trim();
     if (!raw) return;
 
     const btn = document.getElementById('save-btn');
-    btn.textContent = "⏳ Сохранение в облако...";
-    btn.disabled = true;
+    if (btn) {
+        btn.textContent = "⏳ Сохранение в облако...";
+        btn.disabled = true;
+    }
 
     const lines = raw.split('\n');
     const rowsToInsert = [];
@@ -313,9 +332,12 @@ async function addWords() {
         }
     }
 
-    document.getElementById('bulk-input').value = '';
-    btn.textContent = "☁️ Сохранить в Supabase";
-    btn.disabled = false;
+    const bulkInput = document.getElementById('bulk-input');
+    if (bulkInput) bulkInput.value = '';
+    if (btn) {
+        btn.textContent = "☁️ Сохранить в Supabase";
+        btn.disabled = false;
+    }
 }
 
 async function deleteWord(id) {
@@ -336,11 +358,17 @@ async function clearFolderWords() {
     await deleteCurrentFolder();
 }
 
-// --- ОЗВУЧКА ---
+// --- АУДИО И ОЗВУЧКА ---
+function getCurrentVoiceType() {
+    const select = document.getElementById('voiceSelect');
+    return select ? select.value : 'pro';
+}
+
 function getAudioUrl(text, langCode, customUrl) {
     if (customUrl) return customUrl;
     return `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${langCode}&q=${encodeURIComponent(text)}`;
 }
+
 function preloadAudio(text, langCode, customUrl = null) {
     if (!text || text === '—') return;
     const key = customUrl || `${langCode}:${text.toLowerCase()}`;
@@ -439,19 +467,27 @@ function startTraining() {
     }
 
     trainingQueue = [...words];
-    if (document.getElementById('shuffle-check').checked) {
+    const shuffleCheck = document.getElementById('shuffle-check');
+    if (shuffleCheck && shuffleCheck.checked) {
         trainingQueue.sort(() => Math.random() - 0.5);
     }
 
     currentIndex = 0;
     isTraining = true;
 
-    const direction = document.getElementById('direction-select').value;
-    document.getElementById('direction-badge').textContent = direction === 'en-ru' ? 'EN ➔ RU' : 'RU ➔ EN';
-    document.getElementById('active-folder-title').textContent = currentFolder;
+    const directionSelect = document.getElementById('direction-select');
+    const direction = directionSelect ? directionSelect.value : 'en-ru';
+    
+    const dirBadge = document.getElementById('direction-badge');
+    if (dirBadge) dirBadge.textContent = direction === 'en-ru' ? 'EN ➔ RU' : 'RU ➔ EN';
+    
+    const folderTitle = document.getElementById('active-folder-title');
+    if (folderTitle) folderTitle.textContent = currentFolder;
 
-    document.getElementById('setup-screen').classList.add('hidden');
-    document.getElementById('training-screen').classList.remove('hidden');
+    const setupScreen = document.getElementById('setup-screen');
+    const trainingScreen = document.getElementById('training-screen');
+    if (setupScreen) setupScreen.classList.add('hidden');
+    if (trainingScreen) trainingScreen.classList.remove('hidden');
 
     runStep();
 }
@@ -460,11 +496,14 @@ function runStep() {
     if (!isTraining) return;
     clearTimers();
 
-    const mode = document.getElementById('mode-select').value;
+    const modeSelect = document.getElementById('mode-select');
+    const mode = modeSelect ? modeSelect.value : 'once';
+    
     if (currentIndex >= trainingQueue.length) {
         if (mode === 'loop') {
             currentIndex = 0;
-            if (document.getElementById('shuffle-check').checked) {
+            const shuffleCheck = document.getElementById('shuffle-check');
+            if (shuffleCheck && shuffleCheck.checked) {
                 trainingQueue.sort(() => Math.random() - 0.5);
             }
         } else {
@@ -475,9 +514,14 @@ function runStep() {
     }
 
     const item = trainingQueue[currentIndex];
-    const direction = document.getElementById('direction-select').value;
-    const hideAnswer = document.getElementById('hide-answer-check').checked;
-    const delaySec = parseInt(document.getElementById('delay-select').value, 10);
+    const directionSelect = document.getElementById('direction-select');
+    const direction = directionSelect ? directionSelect.value : 'en-ru';
+    
+    const hideAnswerCheck = document.getElementById('hide-answer-check');
+    const hideAnswer = hideAnswerCheck ? hideAnswerCheck.checked : true;
+    
+    const delaySelect = document.getElementById('delay-select');
+    const delaySec = delaySelect ? parseInt(delaySelect.value, 10) : 5;
 
     const promptText = direction === 'en-ru' ? item.en : (item.ru || item.en);
     const promptLang = direction === 'en-ru' ? 'en' : 'ru';
@@ -486,7 +530,6 @@ function runStep() {
     const answerText = direction === 'en-ru' ? (item.ru || '—') : item.en;
     const answerLang = direction === 'en-ru' ? 'ru' : 'en';
     
-    // Выбираем правильный URL для русской озвучки с учетом выбранного голоса
     let answerUrl = '';
     if (direction === 'en-ru') {
         const voiceType = getCurrentVoiceType();
@@ -497,23 +540,35 @@ function runStep() {
 
     setTimeout(() => preloadAudio(answerText, answerLang, answerUrl), 400);
 
-    document.getElementById('progress-counter').textContent = `${currentIndex + 1} / ${trainingQueue.length}`;
-    document.getElementById('status-badge').textContent = "1. Слушайте слово...";
-    document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-emerald-200 text-emerald-900";
+    const progressCounter = document.getElementById('progress-counter');
+    if (progressCounter) progressCounter.textContent = `${currentIndex + 1} / ${trainingQueue.length}`;
     
-    document.getElementById('prompt-word').textContent = promptText;
+    const statusBadge = document.getElementById('status-badge');
+    if (statusBadge) {
+        statusBadge.textContent = "1. Слушайте слово...";
+        statusBadge.className = "text-xs font-semibold px-3 py-1 rounded-full bg-emerald-200 text-emerald-900";
+    }
+    
+    const promptWord = document.getElementById('prompt-word');
+    if (promptWord) promptWord.textContent = promptText;
     
     const answerEl = document.getElementById('answer-word');
-    answerEl.textContent = answerText;
-    if (hideAnswer) {
-        answerEl.classList.add('blur-sm', 'select-none', 'opacity-40');
-    } else {
-        answerEl.classList.remove('blur-sm', 'select-none', 'opacity-40');
+    if (answerEl) {
+        answerEl.textContent = answerText;
+        if (hideAnswer) {
+            answerEl.classList.add('blur-sm', 'select-none', 'opacity-40');
+        } else {
+            answerEl.classList.remove('blur-sm', 'select-none', 'opacity-40');
+        }
     }
 
-    document.getElementById('timer-label').textContent = "Перевод прозвучит через:";
-    document.getElementById('timer-seconds').textContent = `${delaySec} с`;
-    document.getElementById('timer-bar').style.width = '100%';
+    const timerLabel = document.getElementById('timer-label');
+    const timerSeconds = document.getElementById('timer-seconds');
+    const timerBar = document.getElementById('timer-bar');
+    
+    if (timerLabel) timerLabel.textContent = "Перевод прозвучит через:";
+    if (timerSeconds) timerSeconds.textContent = `${delaySec} с`;
+    if (timerBar) timerBar.style.width = '100%';
 
     speakText(promptText, promptLang, promptUrl, () => {
         if (!isTraining) return;
@@ -522,8 +577,11 @@ function runStep() {
 }
 
 function startThinkTimer(seconds, answerText, answerLang, answerUrl) {
-    document.getElementById('status-badge').textContent = "2. Вспомните перевод...";
-    document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-amber-200 text-amber-800";
+    const statusBadge = document.getElementById('status-badge');
+    if (statusBadge) {
+        statusBadge.textContent = "2. Вспомните перевод...";
+        statusBadge.className = "text-xs font-semibold px-3 py-1 rounded-full bg-amber-200 text-amber-800";
+    }
 
     const totalMs = seconds * 1000;
     const startTime = Date.now();
@@ -533,8 +591,11 @@ function startThinkTimer(seconds, answerText, answerLang, answerUrl) {
         const remaining = Math.max(0, totalMs - elapsed);
         const percent = (remaining / totalMs) * 100;
 
-        document.getElementById('timer-bar').style.width = `${percent}%`;
-        document.getElementById('timer-seconds').textContent = `${Math.ceil(remaining / 1000)} с`;
+        const timerBar = document.getElementById('timer-bar');
+        const timerSeconds = document.getElementById('timer-seconds');
+        
+        if (timerBar) timerBar.style.width = `${percent}%`;
+        if (timerSeconds) timerSeconds.textContent = `${Math.ceil(remaining / 1000)} с`;
 
         if (remaining <= 0) {
             clearInterval(countdownInterval);
@@ -546,13 +607,19 @@ function startThinkTimer(seconds, answerText, answerLang, answerUrl) {
 function revealAndSpeakAnswer(answerText, answerLang, answerUrl) {
     if (!isTraining) return;
 
-    document.getElementById('status-badge').textContent = "3. Правильный перевод:";
-    document.getElementById('status-badge').className = "text-xs font-semibold px-3 py-1 rounded-full bg-emerald-200 text-emerald-800";
-    document.getElementById('timer-label').textContent = "Следующее слово...";
-    document.getElementById('timer-seconds').textContent = "";
+    const statusBadge = document.getElementById('status-badge');
+    if (statusBadge) {
+        statusBadge.textContent = "3. Правильный перевод:";
+        statusBadge.className = "text-xs font-semibold px-3 py-1 rounded-full bg-emerald-200 text-emerald-800";
+    }
+    
+    const timerLabel = document.getElementById('timer-label');
+    const timerSeconds = document.getElementById('timer-seconds');
+    if (timerLabel) timerLabel.textContent = "Следующее слово...";
+    if (timerSeconds) timerSeconds.textContent = "";
 
     const answerEl = document.getElementById('answer-word');
-    answerEl.classList.remove('blur-sm', 'select-none', 'opacity-40');
+    if (answerEl) answerEl.classList.remove('blur-sm', 'select-none', 'opacity-40');
 
     speakText(answerText, answerLang, answerUrl, () => {
         if (!isTraining) return;
@@ -585,45 +652,13 @@ function clearTimers() {
 function stopTraining() {
     isTraining = false;
     clearTimers();
-    document.getElementById('training-screen').classList.add('hidden');
-    document.getElementById('setup-screen').classList.remove('hidden');
+    const trainingScreen = document.getElementById('training-screen');
+    const setupScreen = document.getElementById('setup-screen');
+    if (trainingScreen) trainingScreen.classList.add('hidden');
+    if (setupScreen) setupScreen.classList.remove('hidden');
 }
 
-
-// Запуск инициализации при открытии страницы
-initSupabase();
-
-// Функция автоматического перевода через бесплатный публичный API
-async function translateWord() {
-    const textInput = document.getElementById('sourceWord');
-    const targetInput = document.getElementById('targetWord');
-    const text = textInput ? textInput.value.trim() : '';
-
-    if (!text) {
-        alert("Сначала введите английское слово или фразу для перевода!");
-        return;
-    }
-
-    try {
-        if (targetInput) targetInput.placeholder = "Переводим...";
-        
-        // Запрос к бесплатному сервису перевода MyMemory
-        const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`);
-        const data = await response.json();
-        
-        if (data && data.responseData && data.responseData.translatedText) {
-            if (targetInput) targetInput.value = data.responseData.translatedText;
-        } else {
-            if (targetInput) targetInput.placeholder = "Не удалось перевести";
-        }
-    } catch (err) {
-        console.error("Ошибка перевода:", err);
-        alert("Ошибка соединения с сервисом перевода.");
-        if (targetInput) targetInput.placeholder = "Перевод...";
-    }
-}
 // --- СОХРАНЕНИЕ И ВОССТАНОВЛЕНИЕ НАСТРОЕК В БРАУЗЕРЕ ---
-
 function saveUserSettings() {
     const folderSelect = document.getElementById('folder-select');
     const voiceSelect = document.getElementById('voiceSelect');
@@ -646,7 +681,11 @@ function loadUserSettings() {
     try {
         if (localStorage.getItem('user_folder')) {
             const el = document.getElementById('folder-select');
-            if (el) el.value = localStorage.getItem('user_folder');
+            if (el && el.querySelector(`option[value="${localStorage.getItem('user_folder')}"]`)) {
+                el.value = localStorage.getItem('user_folder');
+                currentFolder = el.value;
+                renderUI();
+            }
         }
         if (localStorage.getItem('user_voice')) {
             const el = document.getElementById('voiceSelect');
@@ -677,9 +716,12 @@ function loadUserSettings() {
     }
 }
 
-// Автоматически сохранять настройки при их изменении
+// Автоматически сохранять настройки при их изменении в интерфейсе
 document.addEventListener('change', (event) => {
     if (['folder-select', 'voiceSelect', 'direction-select', 'delay-select', 'mode-select', 'shuffle-check', 'hide-answer-check'].includes(event.target.id)) {
         saveUserSettings();
     }
 });
+
+// --- СТАРТ ПРИЛОЖЕНИЯ ---
+initSupabase();
