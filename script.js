@@ -161,11 +161,23 @@ function renderUI() {
         return;
     }
 
-    words.forEach((item) => {
+        words.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 text-sm';
         div.innerHTML = `
             <div>
+                <span class="font-bold text-slate-800">${item.en}</span>
+                <span class="text-slate-500"> — ${item.ru || '<i class="text-rose-400 text-xs">нет перевода</i>'}</span>
+                ${item.audioEnUrl ? '<span class="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">HD MP3</span>' : ''}
+            </div>
+            <div class="flex items-center gap-1">
+                <button onclick="editWord('${item.id}')" class="text-slate-400 hover:text-emerald-600 px-1.5 transition" title="Редактировать">✏️</button>
+                <button onclick="deleteWord('${item.id}')" class="text-slate-400 hover:text-rose-500 px-1.5 font-bold transition" title="Удалить">✕</button>
+            </div>
+        `;
+        listContainer.appendChild(div);
+    });
+
                 <span class="font-bold text-slate-800">${item.en}</span>
                 <span class="text-slate-500"> — ${item.ru || '<i class="text-rose-400 text-xs">нет перевода</i>'}</span>
                 ${item.audioEnUrl ? '<span class="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">HD MP3</span>' : ''}
