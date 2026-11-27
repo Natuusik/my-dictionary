@@ -300,7 +300,7 @@ async function clearFolderWords() {
     await deleteCurrentFolder();
 }
 
-// --- БУФЕР ОБМЕНА И ПЕРЕВОД (ИСПРАВЛЕНО: вставка в английское поле sourceWord) ---
+// --- БУФЕР ОБМЕНА И ПЕРЕВОД ---
 async function pasteFromClipboard(elementId = 'sourceWord') {
     try {
         const text = await navigator.clipboard.readText();
@@ -310,6 +310,7 @@ async function pasteFromClipboard(elementId = 'sourceWord') {
         console.error("Не удалось прочитать буфер обмена:", err);
     }
 }
+
 
 async function translateWord() {
     const textInput = document.getElementById('sourceWord');
