@@ -18,6 +18,8 @@ let nextStepTimeout = null;
 const audioCache = new Map();
 let activeAudio = null;
 
+const FAVORITE_FOLDER_NAME = "⭐ Избранное";
+
 // --- ИНИЦИАЛИЗАЦИЯ И СТАРТ ПРИЛОЖЕНИЯ ---
 async function initApp() {
     const statusBadge = document.getElementById('db-status');
@@ -68,7 +70,7 @@ async function loadFromDatabase() {
         return;
     }
 
-    foldersMap = { "Папка №1": [] };
+    foldersMap = { "Папка №1": [], [FAVORITE_FOLDER_NAME]: [] };
 
     if (data && data.length > 0) {
         data.forEach(row => {
@@ -76,20 +78,33 @@ async function loadFromDatabase() {
             if (!foldersMap[folderName]) {
                 foldersMap[folderName] = [];
             }
-            foldersMap[folderName].push({
+            
+            const wordObj = {
                 id: row.id,
                 en: row.word_en,
                 ru: row.word_ru || '',
                 audioEnUrl: row.audio_en_url,
                 audioRuUrl: row.audio_ru_url,
-                audioRuFemaleUrl: row.audio_ru_female_url
-            });
+                audioRuFemaleUrl: row.audio_ru_female_url,
+                isFavorite: !!row.is_favorite // Поддержка флага избранного из БД (если колонка есть)
+            };
+
+            foldersMap[folderName].push(wordObj);
+
+            // Если слово помечено как избранное, автоматически дублируем/добавляем в папку Избранное
+            if (wordObj.isFavorite) {
+                if (!foldersMap[FAVORITE_FOLDER_NAME]) foldersMap[FAVORITE_FOLDER_NAME] = [];
+                // Проверяем, чтобы не было дублей
+                if (!foldersMap[FAVORITE_FOLDER_NAME].some(w => w.id === wordObj.id)) {
+                    foldersMap[FAVORITE_FOLDER_NAME].push(wordObj);
+                }
+            }
         });
     }
 
     // Проверяем сохраненную папку
     const savedFolder = localStorage.getItem('user_folder');
-    if (savedFolder && foldersMap[savedFolder]) {
+    if (savedFolder && (savedFolder === "ALL_FOLDERS" || foldersMap[savedFolder])) {
         currentFolder = savedFolder;
     } else {
         const folderKeys = Object.keys(foldersMap);
@@ -106,16 +121,31 @@ function renderUI() {
     
     select.innerHTML = '';
     
-    const folderNames = Object.keys(foldersMap);
-    if (folderNames.length === 0) {
-        foldersMap["Папка №1"] = [];
-        folderNames.push("Папка №1");
-    }
+    const folderNames = Object.keys(foldersMap).filter(name => name !== FAVORITE_FOLDER_NAME);
+    
+    // Всегда добавляем Избранное наверх или в список
+    if (!foldersMap[FAVORITE_FOLDER_NAME]) foldersMap[FAVORITE_FOLDER_NAME] = [];
+    
+    // Добавляем специальный пункт "Все папки"
+    const allOpt = document.createElement('option');
+    allOpt.value = "ALL_FOLDERS";
+    // Считаем общее количество слов во всех обычных папках
+    let totalAllWords = 0;
+    Object.keys(foldersMap).forEach(key => {
+        if (key !== FAVORITE_FOLDER_NAME) totalAllWords += (foldersMap[key] || []).length;
+    });
+    allOpt.textContent = `📚 Все папки (Микс) (${totalAllWords})`;
+    if (currentFolder === "ALL_FOLDERS") allOpt.selected = true;
+    select.appendChild(allOpt);
 
-    if (!foldersMap[currentFolder]) {
-        currentFolder = folderNames[0];
-    }
+    // Добавляем Избранное в селект
+    const favOpt = document.createElement('option');
+    favOpt.value = FAVORITE_FOLDER_NAME;
+    favOpt.textContent = `${FAVORITE_FOLDER_NAME} (${foldersMap[FAVORITE_FOLDER_NAME].length})`;
+    if (currentFolder === FAVORITE_FOLDER_NAME) favOpt.selected = true;
+    select.appendChild(favOpt);
 
+    // Добавляем остальные обычные папки
     folderNames.forEach(name => {
         const option = document.createElement('option');
         option.value = name;
@@ -128,17 +158,29 @@ function renderUI() {
     if (!listContainer) return;
     
     listContainer.innerHTML = '';
-    const words = foldersMap[currentFolder] || [];
+    
+    let words = [];
+    if (currentFolder === "ALL_FOLDERS") {
+        Object.keys(foldersMap).forEach(key => {
+            if (key !== FAVORITE_FOLDER_NAME) {
+                words = words.concat(foldersMap[key]);
+            }
+        });
+    } else {
+        words = foldersMap[currentFolder] || [];
+    }
     
     const badge = document.getElementById('total-words-badge');
     if (badge) badge.textContent = `${words.length} слов`;
 
     if (words.length === 0) {
-        listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Папка пуста. Добавьте слова выше.</p>';
+        listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Список пуст.</p>';
         return;
     }
 
     words.forEach((item) => {
+        const isFav = foldersMap[FAVORITE_FOLDER_NAME] && foldersMap[FAVORITE_FOLDER_NAME].some(w => w.id === item.id);
+        
         const div = document.createElement('div');
         div.className = 'flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 text-sm';
         div.innerHTML = `
@@ -148,12 +190,53 @@ function renderUI() {
                 ${item.audioEnUrl ? '<span class="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">HD MP3</span>' : ''}
             </div>
             <div class="flex items-center gap-1">
+                <button onclick="toggleFavorite('${item.id}')" class="text-slate-400 hover:text-amber-500 px-1.5 transition text-base" title="${isFav ? 'Убрать из избранного' : 'В избранное'}">${isFav ? '⭐' : '☆'}</button>
                 <button onclick="editWord('${item.id}')" class="text-slate-400 hover:text-emerald-600 px-1.5 transition" title="Редактировать">✏️</button>
                 <button onclick="deleteWord('${item.id}')" class="text-slate-400 hover:text-rose-500 px-1.5 font-bold transition" title="Удалить">✕</button>
             </div>
         `;
         listContainer.appendChild(div);
     });
+}
+
+// --- УПРАВЛЕНИЕ ИЗБРАННЫМ ---
+async function toggleFavorite(id) {
+    // Ищем слово во всех папках
+    let targetWord = null;
+    Object.keys(foldersMap).forEach(folder => {
+        const found = (foldersMap[folder] || []).find(w => String(w.id) === String(id));
+        if (found) targetWord = found;
+    });
+
+    if (!targetWord) return;
+
+    const isFavNow = foldersMap[FAVORITE_FOLDER_NAME].some(w => String(w.id) === String(id));
+
+    if (isFavNow) {
+        // Удаляем из избранного
+        foldersMap[FAVORITE_FOLDER_NAME] = foldersMap[FAVORITE_FOLDER_NAME].filter(w => String(w.id) !== String(id));
+        targetWord.isFavorite = false;
+    } else {
+        // Добавляем в избранное
+        if (!foldersMap[FAVORITE_FOLDER_NAME].some(w => String(w.id) === String(id))) {
+            foldersMap[FAVORITE_FOLDER_NAME].push(targetWord);
+        }
+        targetWord.isFavorite = true;
+    }
+
+    // Синхронизируем с базой данных (если колонка is_favorite существует в таблице Supabase)
+    if (supabaseClient) {
+        try {
+            await supabaseClient
+                .from('words_dictation')
+                .update({ is_favorite: !isFavNow })
+                .eq('id', id);
+        } catch (e) {
+            console.log("Колонка is_favorite еще не создана в Supabase, статус сохранен локально");
+        }
+    }
+
+    renderUI();
 }
 
 // --- УПРАВЛЕНИЕ ПАПКАМИ ---
@@ -171,6 +254,10 @@ function createNewFolder() {
     const name = prompt("Введите название новой папки:", `Папка №${nextNum}`);
     if (name && name.trim()) {
         const cleanName = name.trim();
+        if (cleanName === FAVORITE_FOLDER_NAME) {
+            alert("Это зарезервированное имя для избранного!");
+            return;
+        }
         if (!foldersMap[cleanName]) {
             foldersMap[cleanName] = [];
         }
@@ -181,6 +268,18 @@ function createNewFolder() {
 }
 
 async function deleteCurrentFolder() {
+    if (currentFolder === FAVORITE_FOLDER_NAME) {
+        if (!confirm("Очистить весь список избранного?")) return;
+        foldersMap[FAVORITE_FOLDER_NAME] = [];
+        renderUI();
+        return;
+    }
+
+    if (currentFolder === "ALL_FOLDERS") {
+        alert("Нельзя удалить режим общего микса!");
+        return;
+    }
+
     if (!confirm(`Удалить папку "${currentFolder}" и все её слова из облака?`)) return;
 
     if (supabaseClient) {
@@ -212,8 +311,11 @@ async function addNewSingleWord() {
         return;
     }
 
+    // Если выбрано "Все папки", новые слова добавляем в Папку №1 по умолчанию
+    const targetFolderForAdd = (currentFolder === "ALL_FOLDERS" || currentFolder === FAVORITE_FOLDER_NAME) ? "Папка №1" : currentFolder;
+
     const rowsToInsert = [{
-        folder_name: currentFolder,
+        folder_name: targetFolderForAdd,
         word_en: englishWord,
         word_ru: russianWord
     }];
@@ -231,8 +333,8 @@ async function addNewSingleWord() {
             await loadFromDatabase();
         }
     } else {
-        if (!foldersMap[currentFolder]) foldersMap[currentFolder] = [];
-        foldersMap[currentFolder].push({ id: Date.now(), en: englishWord, ru: russianWord });
+        if (!foldersMap[targetFolderForAdd]) foldersMap[targetFolderForAdd] = [];
+        foldersMap[targetFolderForAdd].push({ id: Date.now(), en: englishWord, ru: russianWord });
         if (englishInput) englishInput.value = '';
         if (russianInput) russianInput.value = '';
         renderUI();
@@ -240,14 +342,18 @@ async function addNewSingleWord() {
 }
 
 async function editWord(id) {
-    const words = foldersMap[currentFolder] || [];
-    const item = words.find(w => String(w.id) === String(id));
-    if (!item) return;
+    let targetWord = null;
+    Object.keys(foldersMap).forEach(folder => {
+        const found = (foldersMap[folder] || []).find(w => String(w.id) === String(id));
+        if (found) targetWord = found;
+    });
 
-    const newEn = prompt("Редактировать английское слово/фразу:", item.en);
+    if (!targetWord) return;
+
+    const newEn = prompt("Редактировать английское слово/фразу:", targetWord.en);
     if (newEn === null) return;
 
-    const newRu = prompt("Редактировать перевод:", item.ru);
+    const newRu = prompt("Редактировать перевод:", targetWord.ru);
     if (newRu === null) return;
 
     const cleanEn = newEn.trim();
@@ -276,8 +382,8 @@ async function editWord(id) {
             await loadFromDatabase();
         }
     } else {
-        item.en = cleanEn;
-        item.ru = cleanRu;
+        targetWord.en = cleanEn;
+        targetWord.ru = cleanRu;
         renderUI();
     }
 }
@@ -290,12 +396,20 @@ async function deleteWord(id) {
             .eq('id', id);
         await loadFromDatabase();
     } else {
-        foldersMap[currentFolder] = foldersMap[currentFolder].filter(w => String(w.id) !== String(id));
+        Object.keys(foldersMap).forEach(folder => {
+            foldersMap[folder] = (foldersMap[folder] || []).filter(w => String(w.id) !== String(id));
+        });
         renderUI();
     }
 }
 
 async function clearFolderWords() {
+    if (currentFolder === FAVORITE_FOLDER_NAME) {
+        if (!confirm("Очистить все избранные слова?")) return;
+        foldersMap[FAVORITE_FOLDER_NAME] = [];
+        renderUI();
+        return;
+    }
     if (!confirm("Очистить все слова в этой папке?")) return;
     await deleteCurrentFolder();
 }
@@ -310,7 +424,6 @@ async function pasteFromClipboard(elementId = 'sourceWord') {
         console.error("Не удалось прочитать буфер обмена:", err);
     }
 }
-
 
 async function translateWord() {
     const textInput = document.getElementById('sourceWord');
@@ -440,9 +553,22 @@ function testAudio() {
 
 // --- ЛОГИКА ТРЕНИРОВКИ ---
 function startTraining() {
-    const words = foldersMap[currentFolder] || [];
+    let words = [];
+    if (currentFolder === "ALL_FOLDERS") {
+        Object.keys(foldersMap).forEach(key => {
+            if (key !== FAVORITE_FOLDER_NAME) {
+                words = words.concat(foldersMap[key]);
+            }
+        });
+        // Убираем возможные дубликаты слов по ID
+        words = Array.from(new Set(words.map(w => w.id)))
+            .map(id => words.find(w => w.id === id));
+    } else {
+        words = foldersMap[currentFolder] || [];
+    }
+
     if (words.length === 0) {
-        alert("Добавьте хотя бы одно слово в папку перед началом!");
+        alert("В выбранном разделе нет слов для тренировки!");
         return;
     }
 
@@ -462,7 +588,9 @@ function startTraining() {
     if (dirBadge) dirBadge.textContent = direction === 'en-ru' ? 'EN ➔ RU' : 'RU ➔ EN';
     
     const folderTitle = document.getElementById('active-folder-title');
-    if (folderTitle) folderTitle.textContent = currentFolder;
+    if (folderTitle) {
+        folderTitle.textContent = currentFolder === "ALL_FOLDERS" ? "📚 Все папки (Микс)" : currentFolder;
+    }
 
     const setupScreen = document.getElementById('setup-screen');
     const trainingScreen = document.getElementById('training-screen');
@@ -503,7 +631,7 @@ function runStep() {
     const delaySelect = document.getElementById('delay-select');
     const delaySec = delaySelect ? parseInt(delaySelect.value, 10) : 5;
 
-    const voiceType = getCurrentVoiceType(); // 'pro' (мужской) или 'female' (женский)
+    const voiceType = getCurrentVoiceType();
 
     const promptText = direction === 'en-ru' ? item.en : (item.ru || item.en);
     const promptLang = direction === 'en-ru' ? 'en' : 'ru';
@@ -684,12 +812,12 @@ function loadUserSettings() {
             if (el) el.value = localStorage.getItem('user_delay');
         }
         if (localStorage.getItem('user_mode')) {
-            const el = document.getElementById('mode-select');
+            const el = document.getElementById('user_mode');
             if (el) el.value = localStorage.getItem('user_mode');
         }
         if (localStorage.getItem('user_shuffle') !== null) {
             const el = document.getElementById('shuffle-check');
-            if (el) el.checked = localStorage.getItem('user_shuffle') === 'true';
+            if (el) el.checked = localStorage.getItem('user_shuffle'] === 'true';
         }
         if (localStorage.getItem('user_hide_answer') !== null) {
             const el = document.getElementById('hide-answer-check');
