@@ -50,12 +50,21 @@
                 </div>
             </div>
 <div class="voice-selector-container" style="margin: 15px 0;">
-    <label for="voiceSelect" style="display: block; margin-bottom: 5px; font-weight: 500;">Голос диктора:</label>
-    <select id="voiceSelect" class="form-control" style="padding: 8px; border-radius: 6px; width: 100%;">
-        <option value="pro">👨‍💼 Мужской (Neural - Dmitry / Christopher)</option>
-        <option value="female">👩‍💼 Женский (Neural - Svetlana / Aria)</option>
+    <!-- Выбор голоса для английского языка -->
+    <label for="voiceEnSelect" style="display: block; margin-bottom: 5px; font-weight: 500;">🇬🇧 Английский голос:</label>
+    <select id="voiceEnSelect" class="form-control" style="padding: 8px; border-radius: 6px; width: 100%; margin-bottom: 10px;">
+        <option value="pro">👨‍💼 Мужской (Christopher)</option>
+        <option value="female">👩‍💼 Женский (Aria)</option>
+    </select>
+
+    <!-- Выбор голоса для русского языка -->
+    <label for="voiceRuSelect" style="display: block; margin-bottom: 5px; font-weight: 500;">🇷🇺 Русский голос:</label>
+    <select id="voiceRuSelect" class="form-control" style="padding: 8px; border-radius: 6px; width: 100%;">
+        <option value="pro">👨‍💼 Мужской (Dmitry)</option>
+        <option value="female" selected>👩‍💼 Женский (Svetlana)</option>
     </select>
 </div>
+
             <!-- Добавление слов -->
                       <!-- Улучшенная форма добавления слов (с переводчиком и вставкой) -->
             <div class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
