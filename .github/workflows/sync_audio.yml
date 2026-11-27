@@ -1,8 +1,8 @@
 name: Auto Sync Audio
 
 on:
-  workflow_dispatch:      # Кнопка ручного запуска во вкладке Actions
-  repository_dispatch:    # Сигнал от вашей кнопки на сайте
+  workflow_dispatch:      
+  repository_dispatch:    
     types: [trigger-sync]
 
 jobs:
