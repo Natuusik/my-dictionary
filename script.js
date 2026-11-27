@@ -85,6 +85,7 @@ async function loadFromDatabase() {
                 ru: row.word_ru || '',
                 audioEnUrl: row.audio_en_url,
                 audioRuUrl: row.audio_ru_url,
+                audioEnFemaleUrl: row.audio_en_female_url, 
                 audioRuFemaleUrl: row.audio_ru_female_url,
                 isFavorite: !!row.is_favorite
             };
