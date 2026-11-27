@@ -18,46 +18,10 @@ let nextStepTimeout = null;
 const audioCache = new Map();
 let activeAudio = null;
 
-// --- БУФЕР ОБМЕНА И ПЕРЕВОД ---
-async function pasteFromClipboard(elementId) {
-    try {
-        const text = await navigator.clipboard.readText();
-        const el = document.getElementById(elementId);
-        if (el) el.value = text;
-    } catch (err) {
-        console.error("Не удалось прочитать буфер обмена:", err);
-    }
-}
-
-async function translateWord() {
-    const textInput = document.getElementById('sourceWord');
-    const targetInput = document.getElementById('targetWord');
-    const text = textInput ? textInput.value.trim() : '';
-
-    if (!text) {
-        alert("Сначала введите слово для перевода!");
-        return;
-    }
-
-    try {
-        if (targetInput) targetInput.placeholder = "Переводим...";
-        const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`);
-        const data = await response.json();
-        
-        if (data && data.responseData && data.responseData.translatedText) {
-            if (targetInput) targetInput.value = data.responseData.translatedText;
-        } else {
-            if (targetInput) targetInput.placeholder = "Не удалось перевести";
-        }
-    } catch (err) {
-        console.error("Ошибка перевода:", err);
-        if (targetInput) targetInput.placeholder = "Ошибка перевода";
-    }
-}
-
-// --- ИНИЦИАЛИЗАЦИЯ И РАБОТА С SUPABASE ---
-async function initSupabase() {
+// --- ИНИЦИАЛИЗАЦИЯ И СТАРТ ПРИЛОЖЕНИЯ ---
+async function initApp() {
     const statusBadge = document.getElementById('db-status');
+    
     if (SUPABASE_URL.includes('ВАШ_ПРОЕКТ')) {
         if (statusBadge) {
             statusBadge.textContent = "Нет ключей API";
@@ -69,9 +33,11 @@ async function initSupabase() {
 
     try {
         supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        // Загружаем данные из базы
         await loadFromDatabase();
         
-        // Восстанавливаем настройки из памяти браузера после загрузки БД
+        // Восстанавливаем настройки и выбранную папку из памяти браузера
         loadUserSettings();
 
         if (statusBadge) {
@@ -79,14 +45,16 @@ async function initSupabase() {
             statusBadge.className = "text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full";
         }
     } catch (err) {
-        console.error("Ошибка Supabase:", err);
+        console.error("Ошибка инициализации Supabase:", err);
         if (statusBadge) {
             statusBadge.textContent = "Ошибка БД";
             statusBadge.className = "text-[10px] bg-rose-500 text-white px-2 py-0.5 rounded-full";
         }
+        renderUI();
     }
 }
 
+// --- ЗАГРУЗКА ИЗ БАЗЫ ДАННЫХ ---
 async function loadFromDatabase() {
     if (!supabaseClient) return;
 
@@ -100,13 +68,15 @@ async function loadFromDatabase() {
         return;
     }
 
-    const grouped = {};
+    foldersMap = { "Папка №1": [] };
+
     if (data && data.length > 0) {
         data.forEach(row => {
-            if (!grouped[row.folder_name]) {
-                grouped[row.folder_name] = [];
+            const folderName = row.folder_name || "Папка №1";
+            if (!foldersMap[folderName]) {
+                foldersMap[folderName] = [];
             }
-            grouped[row.folder_name].push({
+            foldersMap[folderName].push({
                 id: row.id,
                 en: row.word_en,
                 ru: row.word_ru || '',
@@ -115,23 +85,20 @@ async function loadFromDatabase() {
                 audioRuFemaleUrl: row.audio_ru_female_url
             });
         });
-        foldersMap = grouped;
-        
-        // Восстанавливаем папку, если она есть в базе
-        const savedFolder = localStorage.getItem('user_folder');
-        if (savedFolder && foldersMap[savedFolder]) {
-            currentFolder = savedFolder;
-        } else if (!foldersMap[currentFolder]) {
-            currentFolder = Object.keys(foldersMap)[0];
-        }
+    }
+
+    // Проверяем сохраненную папку
+    const savedFolder = localStorage.getItem('user_folder');
+    if (savedFolder && foldersMap[savedFolder]) {
+        currentFolder = savedFolder;
     } else {
-        foldersMap = { "Папка №1": [] };
-        currentFolder = "Папка №1";
+        currentFolder = Object.keys(foldersMap)[0];
     }
 
     renderUI();
 }
 
+// --- ОТРИСОВКА ИНТЕРФЕЙСА ---
 function renderUI() {
     const select = document.getElementById('folder-select');
     if (!select) return;
@@ -139,10 +106,19 @@ function renderUI() {
     select.innerHTML = '';
     
     const folderNames = Object.keys(foldersMap);
+    if (folderNames.length === 0) {
+        foldersMap["Папка №1"] = [];
+        folderNames.push("Папка №1");
+    }
+
+    if (!foldersMap[currentFolder]) {
+        currentFolder = folderNames[0];
+    }
+
     folderNames.forEach(name => {
         const option = document.createElement('option');
         option.value = name;
-        option.textContent = `${name} (${foldersMap[name].length})`;
+        option.textContent = `${name} (${(foldersMap[name] || []).length})`;
         if (name === currentFolder) option.selected = true;
         select.appendChild(option);
     });
@@ -179,6 +155,7 @@ function renderUI() {
     });
 }
 
+// --- УПРАВЛЕНИЕ ПАПКАМИ ---
 function selectFolder() {
     const select = document.getElementById('folder-select');
     if (select) {
@@ -221,7 +198,7 @@ async function deleteCurrentFolder() {
     renderUI();
 }
 
-// --- СОХРАНЕНИЕ СЛОВ (Одиночное слово из новой формы) ---
+// --- ДОБАВЛЕНИЕ И РЕДАКТИРОВАНИЕ СЛОВ ---
 async function addNewSingleWord() {
     const englishInput = document.getElementById('sourceWord');
     const russianInput = document.getElementById('targetWord');
@@ -248,7 +225,6 @@ async function addNewSingleWord() {
         if (error) {
             alert("Ошибка сохранения: " + error.message);
         } else {
-            // Очищаем поля ввода
             if (englishInput) englishInput.value = '';
             if (russianInput) russianInput.value = '';
             await loadFromDatabase();
@@ -261,7 +237,6 @@ async function addNewSingleWord() {
     }
 }
 
-// Редактирование слова
 async function editWord(id) {
     const words = foldersMap[currentFolder] || [];
     const item = words.find(w => String(w.id) === String(id));
@@ -305,42 +280,6 @@ async function editWord(id) {
     }
 }
 
-// Сохранение списком (если используется старое поле bulk-input)
-async function addWords() {
-    const raw = document.getElementById('bulk-input') ? document.getElementById('bulk-input').value.trim() : '';
-    if (!raw) return;
-
-    const lines = raw.split('\n');
-    const rowsToInsert = [];
-
-    lines.forEach(line => {
-        if (!line.trim()) return;
-        const parts = line.split(/[-—]/);
-        const en = parts[0].trim();
-        const ru = parts.slice(1).join('-').trim();
-        if (en) {
-            rowsToInsert.push({
-                folder_name: currentFolder,
-                word_en: en,
-                word_ru: ru
-            });
-        }
-    });
-
-    if (rowsToInsert.length > 0 && supabaseClient) {
-        const { error } = await supabaseClient
-            .from('words_dictation')
-            .insert(rowsToInsert);
-        
-        if (error) {
-            alert("Ошибка сохранения: " + error.message);
-        } else {
-            document.getElementById('bulk-input').value = '';
-            await loadFromDatabase();
-        }
-    }
-}
-
 async function deleteWord(id) {
     if (supabaseClient) {
         await supabaseClient
@@ -357,6 +296,43 @@ async function deleteWord(id) {
 async function clearFolderWords() {
     if (!confirm("Очистить все слова в этой папке?")) return;
     await deleteCurrentFolder();
+}
+
+// --- БУФЕР ОБМЕНА И ПЕРЕВОД ---
+async function pasteFromClipboard(elementId) {
+    try {
+        const text = await navigator.clipboard.readText();
+        const el = document.getElementById(elementId);
+        if (el) el.value = text;
+    } catch (err) {
+        console.error("Не удалось прочитать буфер обмена:", err);
+    }
+}
+
+async function translateWord() {
+    const textInput = document.getElementById('sourceWord');
+    const targetInput = document.getElementById('targetWord');
+    const text = textInput ? textInput.value.trim() : '';
+
+    if (!text) {
+        alert("Сначала введите слово для перевода!");
+        return;
+    }
+
+    try {
+        if (targetInput) targetInput.placeholder = "Переводим...";
+        const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|ru`);
+        const data = await response.json();
+        
+        if (data && data.responseData && data.responseData.translatedText) {
+            if (targetInput) targetInput.value = data.responseData.translatedText;
+        } else {
+            if (targetInput) targetInput.placeholder = "Не удалось перевести";
+        }
+    } catch (err) {
+        console.error("Ошибка перевода:", err);
+        if (targetInput) targetInput.placeholder = "Ошибка перевода";
+    }
 }
 
 // --- АУДИО И ОЗВУЧКА ---
@@ -717,12 +693,12 @@ function loadUserSettings() {
     }
 }
 
-// Автоматически сохранять настройки при изменениях
+// Автоматически сохранять настройки при изменениях в интерфейсе
 document.addEventListener('change', (event) => {
     if (['folder-select', 'voiceSelect', 'direction-select', 'delay-select', 'mode-select', 'shuffle-check', 'hide-answer-check'].includes(event.target.id)) {
         saveUserSettings();
     }
 });
 
-// --- СТАРТ ПРИЛОЖЕНИЯ ---
-initSupabase();
+// --- ЗАПУСК ---
+initApp();
