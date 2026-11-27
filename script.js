@@ -86,15 +86,14 @@ async function loadFromDatabase() {
                 audioEnUrl: row.audio_en_url,
                 audioRuUrl: row.audio_ru_url,
                 audioRuFemaleUrl: row.audio_ru_female_url,
-                isFavorite: !!row.is_favorite // Поддержка флага избранного из БД (если колонка есть)
+                isFavorite: !!row.is_favorite
             };
 
             foldersMap[folderName].push(wordObj);
 
-            // Если слово помечено как избранное, автоматически дублируем/добавляем в папку Избранное
+            // Если слово помечено как избранное, добавляем в папку Избранное
             if (wordObj.isFavorite) {
                 if (!foldersMap[FAVORITE_FOLDER_NAME]) foldersMap[FAVORITE_FOLDER_NAME] = [];
-                // Проверяем, чтобы не было дублей
                 if (!foldersMap[FAVORITE_FOLDER_NAME].some(w => w.id === wordObj.id)) {
                     foldersMap[FAVORITE_FOLDER_NAME].push(wordObj);
                 }
@@ -123,13 +122,11 @@ function renderUI() {
     
     const folderNames = Object.keys(foldersMap).filter(name => name !== FAVORITE_FOLDER_NAME);
     
-    // Всегда добавляем Избранное наверх или в список
     if (!foldersMap[FAVORITE_FOLDER_NAME]) foldersMap[FAVORITE_FOLDER_NAME] = [];
     
-    // Добавляем специальный пункт "Все папки"
+    // 1. Опция "Все папки" (Микс)
     const allOpt = document.createElement('option');
     allOpt.value = "ALL_FOLDERS";
-    // Считаем общее количество слов во всех обычных папках
     let totalAllWords = 0;
     Object.keys(foldersMap).forEach(key => {
         if (key !== FAVORITE_FOLDER_NAME) totalAllWords += (foldersMap[key] || []).length;
@@ -138,14 +135,14 @@ function renderUI() {
     if (currentFolder === "ALL_FOLDERS") allOpt.selected = true;
     select.appendChild(allOpt);
 
-    // Добавляем Избранное в селект
+    // 2. Опция "Избранное"
     const favOpt = document.createElement('option');
     favOpt.value = FAVORITE_FOLDER_NAME;
     favOpt.textContent = `${FAVORITE_FOLDER_NAME} (${foldersMap[FAVORITE_FOLDER_NAME].length})`;
     if (currentFolder === FAVORITE_FOLDER_NAME) favOpt.selected = true;
     select.appendChild(favOpt);
 
-    // Добавляем остальные обычные папки
+    // 3. Остальные папки пользователя
     folderNames.forEach(name => {
         const option = document.createElement('option');
         option.value = name;
@@ -166,6 +163,8 @@ function renderUI() {
                 words = words.concat(foldersMap[key]);
             }
         });
+        // Уникализируем слова по ID
+        words = Array.from(new Set(words.map(w => w.id))).map(id => words.find(w => w.id === id));
     } else {
         words = foldersMap[currentFolder] || [];
     }
@@ -174,12 +173,12 @@ function renderUI() {
     if (badge) badge.textContent = `${words.length} слов`;
 
     if (words.length === 0) {
-        listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Список пуст.</p>';
+        listContainer.innerHTML = '<p class="text-xs text-slate-400 text-center py-4">Папка пуста. Добавьте слова выше.</p>';
         return;
     }
 
     words.forEach((item) => {
-        const isFav = foldersMap[FAVORITE_FOLDER_NAME] && foldersMap[FAVORITE_FOLDER_NAME].some(w => w.id === item.id);
+        const isFav = foldersMap[FAVORITE_FOLDER_NAME] && foldersMap[FAVORITE_FOLDER_NAME].some(w => String(w.id) === String(item.id));
         
         const div = document.createElement('div');
         div.className = 'flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 text-sm';
@@ -201,7 +200,6 @@ function renderUI() {
 
 // --- УПРАВЛЕНИЕ ИЗБРАННЫМ ---
 async function toggleFavorite(id) {
-    // Ищем слово во всех папках
     let targetWord = null;
     Object.keys(foldersMap).forEach(folder => {
         const found = (foldersMap[folder] || []).find(w => String(w.id) === String(id));
@@ -213,18 +211,15 @@ async function toggleFavorite(id) {
     const isFavNow = foldersMap[FAVORITE_FOLDER_NAME].some(w => String(w.id) === String(id));
 
     if (isFavNow) {
-        // Удаляем из избранного
         foldersMap[FAVORITE_FOLDER_NAME] = foldersMap[FAVORITE_FOLDER_NAME].filter(w => String(w.id) !== String(id));
         targetWord.isFavorite = false;
     } else {
-        // Добавляем в избранное
         if (!foldersMap[FAVORITE_FOLDER_NAME].some(w => String(w.id) === String(id))) {
             foldersMap[FAVORITE_FOLDER_NAME].push(targetWord);
         }
         targetWord.isFavorite = true;
     }
 
-    // Синхронизируем с базой данных (если колонка is_favorite существует в таблице Supabase)
     if (supabaseClient) {
         try {
             await supabaseClient
@@ -232,7 +227,7 @@ async function toggleFavorite(id) {
                 .update({ is_favorite: !isFavNow })
                 .eq('id', id);
         } catch (e) {
-            console.log("Колонка is_favorite еще не создана в Supabase, статус сохранен локально");
+            console.log("Сохранено локально");
         }
     }
 
@@ -254,8 +249,8 @@ function createNewFolder() {
     const name = prompt("Введите название новой папки:", `Папка №${nextNum}`);
     if (name && name.trim()) {
         const cleanName = name.trim();
-        if (cleanName === FAVORITE_FOLDER_NAME) {
-            alert("Это зарезервированное имя для избранного!");
+        if (cleanName === FAVORITE_FOLDER_NAME || cleanName === "ALL_FOLDERS") {
+            alert("Это зарезервированное имя!");
             return;
         }
         if (!foldersMap[cleanName]) {
@@ -311,7 +306,7 @@ async function addNewSingleWord() {
         return;
     }
 
-    // Если выбрано "Все папки", новые слова добавляем в Папку №1 по умолчанию
+    // Если открыт микс или избранное, новые слова уходят в Папку №1
     const targetFolderForAdd = (currentFolder === "ALL_FOLDERS" || currentFolder === FAVORITE_FOLDER_NAME) ? "Папка №1" : currentFolder;
 
     const rowsToInsert = [{
@@ -560,9 +555,7 @@ function startTraining() {
                 words = words.concat(foldersMap[key]);
             }
         });
-        // Убираем возможные дубликаты слов по ID
-        words = Array.from(new Set(words.map(w => w.id)))
-            .map(id => words.find(w => w.id === id));
+        words = Array.from(new Set(words.map(w => w.id))).map(id => words.find(w => w.id === id));
     } else {
         words = foldersMap[currentFolder] || [];
     }
@@ -793,7 +786,7 @@ function loadUserSettings() {
     try {
         if (localStorage.getItem('user_folder')) {
             const el = document.getElementById('folder-select');
-            if (el && el.querySelector(`option[value="${localStorage.getItem('user_folder')}"]`)) {
+            if (el) {
                 el.value = localStorage.getItem('user_folder');
                 currentFolder = el.value;
                 renderUI();
@@ -812,12 +805,12 @@ function loadUserSettings() {
             if (el) el.value = localStorage.getItem('user_delay');
         }
         if (localStorage.getItem('user_mode')) {
-            const el = document.getElementById('user_mode');
+            const el = document.getElementById('mode-select');
             if (el) el.value = localStorage.getItem('user_mode');
         }
         if (localStorage.getItem('user_shuffle') !== null) {
             const el = document.getElementById('shuffle-check');
-            if (el) el.checked = localStorage.getItem('user_shuffle'] === 'true';
+            if (el) el.checked = localStorage.getItem('user_shuffle') === 'true';
         }
         if (localStorage.getItem('user_hide_answer') !== null) {
             const el = document.getElementById('hide-answer-check');
