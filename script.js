@@ -507,7 +507,8 @@ function runStep() {
     
     const answerText = direction === 'en-ru' ? (item.ru || '—') : item.en;
     const answerLang = direction === 'en-ru' ? 'ru' : 'en';
-    
+    const promptUrl = direction === 'en-ru' ? item.audioEnUrl : item.audioRuUrl;
+
     // ИСПРАВЛЕННАЯ ЛОГИКА ГОЛОСОВ: оба языка используют выбранный голос (для русской озвучки берем female или pro)
     let promptUrl = '';
     let answerUrl = '';
