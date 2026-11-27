@@ -161,7 +161,7 @@ function renderUI() {
         return;
     }
 
-        words.forEach((item) => {
+    words.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'flex justify-between items-center bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 text-sm';
         div.innerHTML = `
@@ -174,15 +174,6 @@ function renderUI() {
                 <button onclick="editWord('${item.id}')" class="text-slate-400 hover:text-emerald-600 px-1.5 transition" title="Редактировать">✏️</button>
                 <button onclick="deleteWord('${item.id}')" class="text-slate-400 hover:text-rose-500 px-1.5 font-bold transition" title="Удалить">✕</button>
             </div>
-        `;
-        listContainer.appendChild(div);
-    });
-
-                <span class="font-bold text-slate-800">${item.en}</span>
-                <span class="text-slate-500"> — ${item.ru || '<i class="text-rose-400 text-xs">нет перевода</i>'}</span>
-                ${item.audioEnUrl ? '<span class="ml-1 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">HD MP3</span>' : ''}
-            </div>
-            <button onclick="deleteWord('${item.id}')" class="text-slate-400 hover:text-rose-500 px-2 font-bold">✕</button>
         `;
         listContainer.appendChild(div);
     });
@@ -266,6 +257,50 @@ async function addNewSingleWord() {
         foldersMap[currentFolder].push({ id: Date.now(), en: englishWord, ru: russianWord });
         if (englishInput) englishInput.value = '';
         if (russianInput) russianInput.value = '';
+        renderUI();
+    }
+}
+
+// Редактирование слова
+async function editWord(id) {
+    const words = foldersMap[currentFolder] || [];
+    const item = words.find(w => String(w.id) === String(id));
+    if (!item) return;
+
+    const newEn = prompt("Редактировать английское слово/фразу:", item.en);
+    if (newEn === null) return;
+
+    const newRu = prompt("Редактировать перевод:", item.ru);
+    if (newRu === null) return;
+
+    const cleanEn = newEn.trim();
+    const cleanRu = newRu.trim();
+
+    if (!cleanEn) {
+        alert("Английское слово не может быть пустым!");
+        return;
+    }
+
+    if (supabaseClient) {
+        const { error } = await supabaseClient
+            .from('words_dictation')
+            .update({
+                word_en: cleanEn,
+                word_ru: cleanRu,
+                audio_en_url: null,
+                audio_ru_url: null,
+                audio_ru_female_url: null
+            })
+            .eq('id', id);
+
+        if (error) {
+            alert("Ошибка при редактировании: " + error.message);
+        } else {
+            await loadFromDatabase();
+        }
+    } else {
+        item.en = cleanEn;
+        item.ru = cleanRu;
         renderUI();
     }
 }
