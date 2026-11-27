@@ -500,18 +500,23 @@ function runStep() {
     const delaySelect = document.getElementById('delay-select');
     const delaySec = delaySelect ? parseInt(delaySelect.value, 10) : 5;
 
+    const voiceType = getCurrentVoiceType(); // 'pro' (мужской) или 'female' (женский)
+
     const promptText = direction === 'en-ru' ? item.en : (item.ru || item.en);
     const promptLang = direction === 'en-ru' ? 'en' : 'ru';
-    const promptUrl = direction === 'en-ru' ? item.audioEnUrl : item.audioRuUrl;
     
     const answerText = direction === 'en-ru' ? (item.ru || '—') : item.en;
     const answerLang = direction === 'en-ru' ? 'ru' : 'en';
     
+    // ИСПРАВЛЕННАЯ ЛОГИКА ГОЛОСОВ: оба языка используют выбранный голос (для русской озвучки берем female или pro)
+    let promptUrl = '';
     let answerUrl = '';
+
     if (direction === 'en-ru') {
-        const voiceType = getCurrentVoiceType();
+        promptUrl = item.audioEnUrl;
         answerUrl = (voiceType === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
     } else {
+        promptUrl = (voiceType === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
         answerUrl = item.audioEnUrl;
     }
 
