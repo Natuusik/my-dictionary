@@ -91,7 +91,6 @@ async function loadFromDatabase() {
 
             foldersMap[folderName].push(wordObj);
 
-            // Если слово помечено как избранное, добавляем в папку Избранное
             if (wordObj.isFavorite) {
                 if (!foldersMap[FAVORITE_FOLDER_NAME]) foldersMap[FAVORITE_FOLDER_NAME] = [];
                 if (!foldersMap[FAVORITE_FOLDER_NAME].some(w => w.id === wordObj.id)) {
@@ -101,7 +100,6 @@ async function loadFromDatabase() {
         });
     }
 
-    // Проверяем сохраненную папку
     const savedFolder = localStorage.getItem('user_folder');
     if (savedFolder && (savedFolder === "ALL_FOLDERS" || foldersMap[savedFolder])) {
         currentFolder = savedFolder;
@@ -121,7 +119,6 @@ function renderUI() {
     select.innerHTML = '';
     
     const folderNames = Object.keys(foldersMap).filter(name => name !== FAVORITE_FOLDER_NAME);
-    
     if (!foldersMap[FAVORITE_FOLDER_NAME]) foldersMap[FAVORITE_FOLDER_NAME] = [];
     
     // 1. Опция "Все папки" (Микс)
@@ -142,7 +139,7 @@ function renderUI() {
     if (currentFolder === FAVORITE_FOLDER_NAME) favOpt.selected = true;
     select.appendChild(favOpt);
 
-    // 3. Остальные папки пользователя
+    // 3. Остальные папки
     folderNames.forEach(name => {
         const option = document.createElement('option');
         option.value = name;
@@ -163,7 +160,6 @@ function renderUI() {
                 words = words.concat(foldersMap[key]);
             }
         });
-        // Уникализируем слова по ID
         words = Array.from(new Set(words.map(w => w.id))).map(id => words.find(w => w.id === id));
     } else {
         words = foldersMap[currentFolder] || [];
@@ -306,7 +302,6 @@ async function addNewSingleWord() {
         return;
     }
 
-    // Если открыт микс или избранное, новые слова уходят в Папку №1
     const targetFolderForAdd = (currentFolder === "ALL_FOLDERS" || currentFolder === FAVORITE_FOLDER_NAME) ? "Папка №1" : currentFolder;
 
     const rowsToInsert = [{
@@ -446,10 +441,15 @@ async function translateWord() {
     }
 }
 
-// --- АУДИО И ОЗВУЧКА ---
-function getCurrentVoiceType() {
-    const select = document.getElementById('voiceSelect');
+// --- АУДИО И ОЗВУЧКА (Независимый выбор голосов) ---
+function getEnglishVoiceType() {
+    const select = document.getElementById('voiceEnSelect');
     return select ? select.value : 'pro';
+}
+
+function getRussianVoiceType() {
+    const select = document.getElementById('voiceRuSelect');
+    return select ? select.value : 'female';
 }
 
 function getAudioUrl(text, langCode, customUrl) {
@@ -624,7 +624,9 @@ function runStep() {
     const delaySelect = document.getElementById('delay-select');
     const delaySec = delaySelect ? parseInt(delaySelect.value, 10) : 5;
 
-    const voiceType = getCurrentVoiceType();
+    // Получаем независимый выбор голосов для каждого языка
+    const enVoice = getEnglishVoiceType();
+    const ruVoice = getRussianVoiceType();
 
     const promptText = direction === 'en-ru' ? item.en : (item.ru || item.en);
     const promptLang = direction === 'en-ru' ? 'en' : 'ru';
@@ -635,11 +637,12 @@ function runStep() {
     let promptUrl = '';
     let answerUrl = '';
 
+    // Подстановка аудио с учетом раздельного выбора голосов
     if (direction === 'en-ru') {
-        promptUrl = item.audioEnUrl;
-        answerUrl = (voiceType === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
+        promptUrl = item.audioEnUrl; 
+        answerUrl = (ruVoice === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
     } else {
-        promptUrl = (voiceType === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
+        promptUrl = (ruVoice === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
         answerUrl = item.audioEnUrl;
     }
 
@@ -766,7 +769,8 @@ function stopTraining() {
 // --- СОХРАНЕНИЕ И ВОССТАНОВЛЕНИЕ НАСТРОЕК ---
 function saveUserSettings() {
     const folderSelect = document.getElementById('folder-select');
-    const voiceSelect = document.getElementById('voiceSelect');
+    const voiceEnSelect = document.getElementById('voiceEnSelect');
+    const voiceRuSelect = document.getElementById('voiceRuSelect');
     const directionSelect = document.getElementById('direction-select');
     const delaySelect = document.getElementById('delay-select');
     const modeSelect = document.getElementById('mode-select');
@@ -774,7 +778,8 @@ function saveUserSettings() {
     const hideAnswerCheck = document.getElementById('hide-answer-check');
 
     if (folderSelect) localStorage.setItem('user_folder', folderSelect.value);
-    if (voiceSelect) localStorage.setItem('user_voice', voiceSelect.value);
+    if (voiceEnSelect) localStorage.setItem('user_en_voice', voiceEnSelect.value);
+    if (voiceRuSelect) localStorage.setItem('user_ru_voice', voiceRuSelect.value);
     if (directionSelect) localStorage.setItem('user_direction', directionSelect.value);
     if (delaySelect) localStorage.setItem('user_delay', delaySelect.value);
     if (modeSelect) localStorage.setItem('user_mode', modeSelect.value);
@@ -792,9 +797,13 @@ function loadUserSettings() {
                 renderUI();
             }
         }
-        if (localStorage.getItem('user_voice')) {
-            const el = document.getElementById('voiceSelect');
-            if (el) el.value = localStorage.getItem('user_voice');
+        if (localStorage.getItem('user_en_voice')) {
+            const el = document.getElementById('voiceEnSelect');
+            if (el) el.value = localStorage.getItem('user_en_voice');
+        }
+        if (localStorage.getItem('user_ru_voice')) {
+            const el = document.getElementById('voiceRuSelect');
+            if (el) el.value = localStorage.getItem('user_ru_voice');
         }
         if (localStorage.getItem('user_direction')) {
             const el = document.getElementById('direction-select');
@@ -823,7 +832,7 @@ function loadUserSettings() {
 
 // Автоматически сохранять настройки при изменениях в интерфейсе
 document.addEventListener('change', (event) => {
-    if (['folder-select', 'voiceSelect', 'direction-select', 'delay-select', 'mode-select', 'shuffle-check', 'hide-answer-check'].includes(event.target.id)) {
+    if (['folder-select', 'voiceEnSelect', 'voiceRuSelect', 'direction-select', 'delay-select', 'mode-select', 'shuffle-check', 'hide-answer-check'].includes(event.target.id)) {
         saveUserSettings();
     }
 });
