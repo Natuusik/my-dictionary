@@ -92,7 +92,8 @@ async function loadFromDatabase() {
     if (savedFolder && foldersMap[savedFolder]) {
         currentFolder = savedFolder;
     } else {
-        currentFolder = Object.keys(foldersMap)[0];
+        const folderKeys = Object.keys(foldersMap);
+        currentFolder = folderKeys.length > 0 ? folderKeys[0] : "Папка №1";
     }
 
     renderUI();
@@ -230,6 +231,7 @@ async function addNewSingleWord() {
             await loadFromDatabase();
         }
     } else {
+        if (!foldersMap[currentFolder]) foldersMap[currentFolder] = [];
         foldersMap[currentFolder].push({ id: Date.now(), en: englishWord, ru: russianWord });
         if (englishInput) englishInput.value = '';
         if (russianInput) russianInput.value = '';
@@ -507,9 +509,8 @@ function runStep() {
     
     const answerText = direction === 'en-ru' ? (item.ru || '—') : item.en;
     const answerLang = direction === 'en-ru' ? 'ru' : 'en';
-    const promptUrl = direction === 'en-ru' ? item.audioEnUrl : item.audioRuUrl;
 
-    // ИСПРАВЛЕННАЯ ЛОГИКА ГОЛОСОВ: оба языка используют выбранный голос (для русской озвучки берем female или pro)
+    // Исправленная логика выбора аудиоссылок с учетом выбранного голоса
     let promptUrl = '';
     let answerUrl = '';
 
