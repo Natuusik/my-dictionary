@@ -300,8 +300,8 @@ async function clearFolderWords() {
     await deleteCurrentFolder();
 }
 
-// --- БУФЕР ОБМЕНА И ПЕРЕВОД ---
-async function pasteFromClipboard(elementId) {
+// --- БУФЕР ОБМЕНА И ПЕРЕВОД (ИСПРАВЛЕНО: вставка в английское поле sourceWord) ---
+async function pasteFromClipboard(elementId = 'sourceWord') {
     try {
         const text = await navigator.clipboard.readText();
         const el = document.getElementById(elementId);
@@ -317,7 +317,7 @@ async function translateWord() {
     const text = textInput ? textInput.value.trim() : '';
 
     if (!text) {
-        alert("Сначала введите слово для перевода!");
+        alert("Сначала введите английское слово в первое поле для перевода!");
         return;
     }
 
