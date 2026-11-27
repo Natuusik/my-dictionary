@@ -362,11 +362,12 @@ async function editWord(id) {
                 word_en: cleanEn,
                 word_ru: cleanRu,
                 audio_en_url: null,
+                audio_en_female_url: null, // <--- добавьте эту строчку
                 audio_ru_url: null,
                 audio_ru_female_url: null
             })
             .eq('id', id);
-
+        
         if (error) {
             alert("Ошибка при редактировании: " + error.message);
         } else {
