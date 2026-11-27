@@ -9,7 +9,8 @@ BUCKET_NAME = "voices"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-VOICE_EN = "en-US-ChristopherNeural"
+VOICE_EN_MALE = "en-US-ChristopherNeural"
+VOICE_EN_FEMALE = "en-US-AriaNeural"
 VOICE_RU_MALE = "ru-RU-DmitryNeural"
 VOICE_RU_FEMALE = "ru-RU-SvetlanaNeural"
 
@@ -31,28 +32,42 @@ async def generate_and_upload():
         word_ru = row.get("word_ru")
         
         audio_en_url = row.get("audio_en_url")
+        audio_en_female_url = row.get("audio_en_female_url")
         audio_ru_url = row.get("audio_ru_url")
         audio_ru_female_url = row.get("audio_ru_female_url")
         
         updates = {}
         
-        # Обрабатываем каждое слово с защитой от сбоев
         try:
-            # 1. Английский
+            # 1. Английский (Мужской)
             if not audio_en_url and word_en:
-                print(f"🎙 Генерируем EN: {word_en}")
+                print(f"🎙 Генерируем EN (мужской): {word_en}")
                 filename_en = f"en_audio_pro/en_{word_id}.mp3"
                 local_path_en = os.path.join("temp_audio", f"en_{word_id}.mp3")
                 
-                communicate = edge_tts.Communicate(word_en, VOICE_EN)
+                communicate = edge_tts.Communicate(word_en, VOICE_EN_MALE)
                 await communicate.save(local_path_en)
                 with open(local_path_en, "rb") as f:
                     supabase.storage.from_(BUCKET_NAME).upload(
                         path=filename_en, file=f, file_options={"upsert": "true"}
                     )
                 updates["audio_en_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_en)
+
+            # 2. Английский (Женский)
+            if not audio_en_female_url and word_en:
+                print(f"🎙 Генерируем EN (женский): {word_en}")
+                filename_en_fem = f"en_audio_female/en_fem_{word_id}.mp3"
+                local_path_en_fem = os.path.join("temp_audio", f"en_fem_{word_id}.mp3")
+                
+                communicate = edge_tts.Communicate(word_en, VOICE_EN_FEMALE)
+                await communicate.save(local_path_en_fem)
+                with open(local_path_en_fem, "rb") as f:
+                    supabase.storage.from_(BUCKET_NAME).upload(
+                        path=filename_en_fem, file=f, file_options={"upsert": "true"}
+                    )
+                updates["audio_en_female_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_en_fem)
                     
-            # 2. Русский (Мужской)
+            # 3. Русский (Мужской)
             if not audio_ru_url and word_ru:
                 print(f"🎙 Генерируем RU (мужской) для: {word_ru}")
                 filename_ru = f"ru_audio_pro/ru_{word_id}.mp3"
@@ -66,29 +81,24 @@ async def generate_and_upload():
                     )
                 updates["audio_ru_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_ru)
 
-            # 3. Русский (Женский) - если колонка существует
-            if word_ru:
-                try:
-                    if not audio_ru_female_url:
-                        print(f"🎙 Генерируем RU (женский) для: {word_ru}")
-                        filename_ru_fem = f"ru_audio_female/ru_fem_{word_id}.mp3"
-                        local_path_ru_fem = os.path.join("temp_audio", f"ru_fem_{word_id}.mp3")
-                        
-                        communicate = edge_tts.Communicate(word_ru, VOICE_RU_FEMALE)
-                        await communicate.save(local_path_ru_fem)
-                        with open(local_path_ru_fem, "rb") as f:
-                            supabase.storage.from_(BUCKET_NAME).upload(
-                                path=filename_ru_fem, file=f, file_options={"upsert": "true"}
-                            )
-                        updates["audio_ru_female_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_ru_fem)
-                except Exception as fem_err:
-                    print(f"⚠️ Пропущено женское аудио (возможно, нет колонки audio_ru_female_url): {fem_err}")
+            # 4. Русский (Женский)
+            if not audio_ru_female_url and word_ru:
+                print(f"🎙 Генерируем RU (женский) для: {word_ru}")
+                filename_ru_fem = f"ru_audio_female/ru_fem_{word_id}.mp3"
+                local_path_ru_fem = os.path.join("temp_audio", f"ru_fem_{word_id}.mp3")
+                
+                communicate = edge_tts.Communicate(word_ru, VOICE_RU_FEMALE)
+                await communicate.save(local_path_ru_fem)
+                with open(local_path_ru_fem, "rb") as f:
+                    supabase.storage.from_(BUCKET_NAME).upload(
+                        path=filename_ru_fem, file=f, file_options={"upsert": "true"}
+                    )
+                updates["audio_ru_female_url"] = supabase.storage.from_(BUCKET_NAME).get_public_url(filename_ru_fem)
                     
             if updates:
                 supabase.table("words_dictation").update(updates).eq("id", word_id).execute()
                 print(f"🔄 База Supabase обновлена для ID: {word_id}\n")
             
-            # Пауза между словами, чтобы сервер озвучки не блокировал запросы
             await asyncio.sleep(1)
             
         except Exception as e:
