@@ -639,15 +639,14 @@ function runStep() {
     let promptUrl = '';
     let answerUrl = '';
 
-    // Подстановка аудио с учетом раздельного выбора голосов
+ // Подстановка аудио с учетом раздельного выбора голосов для ОБЕИХ языков
     if (direction === 'en-ru') {
-        promptUrl = item.audioEnUrl; 
+        promptUrl = (enVoice === 'female') ? item.audioEnFemaleUrl : item.audioEnUrl; 
         answerUrl = (ruVoice === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
     } else {
         promptUrl = (ruVoice === 'female') ? item.audioRuFemaleUrl : item.audioRuUrl;
-        answerUrl = item.audioEnUrl;
+        answerUrl = (enVoice === 'female') ? item.audioEnFemaleUrl : item.audioEnUrl;
     }
-
     setTimeout(() => preloadAudio(answerText, answerLang, answerUrl), 400);
 
     const progressCounter = document.getElementById('progress-counter');
